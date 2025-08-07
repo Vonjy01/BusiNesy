@@ -13,14 +13,14 @@ class User {
 
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
-      id: json['id'] as String,
-      nom: json['nom'] as String,
-      telephone: json['telephone'] as String,
-      motDePasse: json['mot_de_passe'] as String,
+      id: json['id'].toString(),
+      nom: json['nom'].toString(),
+      telephone: json['telephone'].toString(),
+      motDePasse: json['mot_de_passe'].toString(),
     );
   }
 
-  Map<String, dynamic> toJson() {
+  Map<String, dynamic> toMap() { // Renommez en toMap pour cohérence
     return {
       'id': id,
       'nom': nom,

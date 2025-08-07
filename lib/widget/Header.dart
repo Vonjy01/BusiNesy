@@ -15,12 +15,14 @@ class Header extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 150,
+ @override
+Widget build(BuildContext context) {
+  return SizedBox(
+    height: 150, // Hauteur fixe
+    child: Container(
       decoration: const BoxDecoration(
         borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
-        gradient: headerGradient
+        gradient: headerGradient,
       ),
       padding: const EdgeInsets.only(top: 30, left: 20, right: 20),
       child: Column(
@@ -35,19 +37,20 @@ class Header extends StatelessWidget {
                   onPressed: () => Scaffold.of(context).openDrawer(),
                 )
               else
-                const SizedBox(width: 48), 
+                const SizedBox(width: 48),
               
               Text(
                 title,
                 style: const TextStyle(color: Colors.white, fontSize: 18),
               ),
               
-              const SizedBox(width: 48), // Pour l'équilibre visuel
+              const SizedBox(width: 48),
             ],
           ),
-          content ?? const SizedBox(), // Contenu personnalisé ou vide
+          if (content != null) Expanded(child: content!),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 }

@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:project6/controller/auth_controller.dart';
 import 'package:project6/page/nouveau_entreprise.dart';
 
-
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
 
@@ -16,44 +15,76 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _nomController = TextEditingController();
   final _telephoneController = TextEditingController();
   final _passwordController = TextEditingController();
+  bool _isLoading = false;
 
   @override
   Widget build(BuildContext context) {
-    final authState = ref.watch(authControllerProvider);
-
     return Scaffold(
       appBar: AppBar(title: const Text('Inscription')),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            children: [
-              TextFormField(
-                controller: _nomController,
-                decoration: const InputDecoration(labelText: 'Nom complet'),
-                validator: (value) => value!.isEmpty ? 'Champ obligatoire' : null,
-              ),
-              TextFormField(
-                controller: _telephoneController,
-                decoration: const InputDecoration(labelText: 'Téléphone'),
-                keyboardType: TextInputType.phone,
-                validator: (value) => value!.isEmpty ? 'Champ obligatoire' : null,
-              ),
-              TextFormField(
-                controller: _passwordController,
-                decoration: const InputDecoration(labelText: 'Mot de passe'),
-                obscureText: true,
-                validator: (value) => value!.isEmpty ? 'Champ obligatoire' : null,
-              ),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: authState.isLoading ? null : _register,
-                child: authState.isLoading
-                    ? const CircularProgressIndicator()
-                    : const Text('S\'inscrire'),
-              ),
-            ],
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              children: [
+                const SizedBox(height: 20),
+                TextFormField(
+                  controller: _nomController,
+                  decoration: InputDecoration(
+                    labelText: 'Nom complet',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  validator: (value) => value!.isEmpty ? 'Champ obligatoire' : null,
+                ),
+                const SizedBox(height: 20),
+                TextFormField(
+                  controller: _telephoneController,
+                  decoration: InputDecoration(
+                    labelText: 'Téléphone',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  keyboardType: TextInputType.phone,
+                  validator: (value) => value!.isEmpty ? 'Champ obligatoire' : null,
+                ),
+                const SizedBox(height: 20),
+                TextFormField(
+                  controller: _passwordController,
+                  decoration: InputDecoration(
+                    labelText: 'Mot de passe',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  obscureText: true,
+                  validator: (value) {
+                    if (value!.isEmpty) return 'Champ obligatoire';
+                    if (value.length < 4) return '4 caractères minimum';
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 30),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 15),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    onPressed: _isLoading ? null : _register,
+                    child: _isLoading
+                        ? const CircularProgressIndicator()
+                        : const Text('S\'inscrire'),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -61,26 +92,32 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   }
 
   Future<void> _register() async {
-    if (_formKey.currentState!.validate()) {
-        try {
-          await ref.read(authControllerProvider.notifier).register(
-                nom: _nomController.text,
-                telephone: _telephoneController.text,
-                motDePasse: _passwordController.text,
-              );
-        
-        if (mounted) {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const NouveauEntreprise()),
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
+    try {
+      await ref.read(authControllerProvider.notifier).register(
+            nom: _nomController.text,
+            telephone: _telephoneController.text,
+            motDePasse: _passwordController.text,
           );
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(e.toString())),
-          );
-        }
+      
+      if (mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+MaterialPageRoute(builder: (_) => NouveauEntreprise()),          (route) => false,
+        );
       }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 

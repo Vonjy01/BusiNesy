@@ -4,8 +4,6 @@ import 'package:project6/controller/auth_controller.dart';
 import 'package:project6/page/auth/register.dart';
 import 'package:project6/page/home_page.dart';
 
-
-
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
@@ -17,45 +15,71 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _telephoneController = TextEditingController();
   final _passwordController = TextEditingController();
+  bool _isLoading = false;
 
   @override
   Widget build(BuildContext context) {
-    final authState = ref.watch(authControllerProvider);
-
     return Scaffold(
       appBar: AppBar(title: const Text('Connexion')),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            children: [
-              TextFormField(
-                controller: _telephoneController,
-                decoration: const InputDecoration(labelText: 'Téléphone'),
-                validator: (value) => value!.isEmpty ? 'Champ obligatoire' : null,
-              ),
-              TextFormField(
-                controller: _passwordController,
-                decoration: const InputDecoration(labelText: 'Mot de passe'),
-                obscureText: true,
-                validator: (value) => value!.isEmpty ? 'Champ obligatoire' : null,
-              ),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: authState.isLoading ? null : _login,
-                child: authState.isLoading
-                    ? const CircularProgressIndicator()
-                    : const Text('Se connecter'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const RegisterScreen()),
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              children: [
+                const SizedBox(height: 40),
+                TextFormField(
+                  controller: _telephoneController,
+                  decoration: InputDecoration(
+                    labelText: 'Téléphone',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  keyboardType: TextInputType.phone,
+                  validator: (value) => value!.isEmpty ? 'Champ obligatoire' : null,
                 ),
-                child: const Text('Créer un compte'),
-              ),
-            ],
+                const SizedBox(height: 20),
+                TextFormField(
+                  controller: _passwordController,
+                  decoration: InputDecoration(
+                    labelText: 'Mot de passe',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  obscureText: true,
+                  validator: (value) => value!.isEmpty ? 'Champ obligatoire' : null,
+                ),
+                const SizedBox(height: 30),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 15),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    onPressed: _isLoading ? null : _login,
+                    child: _isLoading
+                        ? const CircularProgressIndicator()
+                        : const Text('Se connecter'),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                TextButton(
+                  onPressed: _isLoading
+                      ? null
+                      : () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const RegisterScreen()),
+                          ),
+                  child: const Text('Créer un compte'),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -63,25 +87,32 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _login() async {
-    if (_formKey.currentState!.validate()) {
-      try {
-        await ref.read(authControllerProvider.notifier).login(
-              _telephoneController.text,
-              _passwordController.text,
-            );
-        
-        if (mounted) {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const HomePage()),
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
+    try {
+      await ref.read(authControllerProvider.notifier).login(
+            _telephoneController.text,
+            _passwordController.text,
           );
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(e.toString())),
-          );
-        }
+      
+      if (mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const HomePage()),
+          (route) => false,
+        );
       }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 

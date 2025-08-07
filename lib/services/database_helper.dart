@@ -7,7 +7,7 @@ import 'package:flutter/services.dart';
 
 class DatabaseHelper {
   static const String _dbName = 'Gestock.db';
-  static const int _dbVersion = 2;
+  static const int _dbVersion = 4;
 
   DatabaseHelper._privateConstructor();
   static final DatabaseHelper instance = DatabaseHelper._privateConstructor();
@@ -59,24 +59,20 @@ class DatabaseHelper {
       _database = null;
     }
   }
-  Future<List<Map<String, dynamic>>> getAllUsers() async {
-  final db = await database;
-  return await db.query('users');
-}
 Future<void> debugDatabase() async {
-  final db = await database;
-  
-  // Liste des tables
-  final tables = await db.rawQuery("SELECT name FROM sqlite_master WHERE type='table'");
-  print('Tables: $tables');
-  
-  // Contenu de la table users
-  final users = await db.query('users');
-  print('Utilisateurs: $users');
-  
-  // Exécutez cette méthode au démarrage
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    DatabaseHelper.instance.debugDatabase();
-  });
+  try {
+    final db = await database;
+    final users = await db.query('users');
+    final entreprises = await db.query('entreprises');
+    
+    debugPrint('=== DEBUG DATABASE ===');
+    debugPrint('Utilisateurs: ${users.length}');
+    debugPrint('Entreprises: ${entreprises.length}');
+    if (entreprises.isNotEmpty) {
+      debugPrint('Dernière entreprise: ${entreprises.last}');
+    }
+  } catch (e) {
+    debugPrint('Erreur debugDatabase: $e');
+  }
 }
 }

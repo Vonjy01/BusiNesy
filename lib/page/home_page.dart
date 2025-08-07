@@ -2,7 +2,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:project6/controller/auth_controller.dart';
-import 'package:project6/models/user_model.dart';
+import 'package:project6/controller/entreprise_controller.dart';
 import 'package:project6/utils/constant.dart';
 import 'package:project6/widget/Header.dart';
 import 'package:project6/widget/app_drawer.dart';
@@ -21,24 +21,85 @@ class _HomePageState extends ConsumerState<HomePage> {
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authControllerProvider);
+    final activeEntrepriseAsync = ref.watch(activeEntrepriseProvider);
 
     return authState.when(
-      loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (error, stack) => Scaffold(body: Center(child: Text('Erreur: $error'))),
+      loading: () =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
+      error: (error, stack) =>
+          Scaffold(body: Center(child: Text('Erreur: $error'))),
       data: (user) {
         if (user == null) {
-          // Rediriger vers la page de connexion si aucun utilisateur n'est connecté
           WidgetsBinding.instance.addPostFrameCallback((_) {
             Navigator.pushReplacementNamed(context, '/login');
           });
-          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
         }
 
         return Scaffold(
           drawer: AppDrawer(user: user),
           body: Column(
             children: [
-              const Header(title: 'Page d\'accueil'),
+              Header(
+                title: 'Page d\'accueil',
+                content: SizedBox.expand(
+                  child: Padding(
+                    padding: const EdgeInsets.only(
+                      bottom: 0,
+                    ), // Ajustez pour coller parfaitement en bas
+                    child: Align(
+                      alignment: Alignment.bottomCenter,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: theme_light,
+                          borderRadius: BorderRadius.only(
+                            topLeft: Radius.circular(8),
+                            topRight: Radius.circular(8),
+                            bottomRight: Radius.circular(
+                              0,
+                            ), // Pas d'arrondi pour coller au bord
+                          ),
+                        ),
+                        child: activeEntrepriseAsync.when(
+                          loading: () => const CircularProgressIndicator(
+                            color: Colors.white,
+                          ),
+                          error: (_, __) => const Text(
+                            'Erreur de chargement',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                          data: (entreprise) => Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.business,
+                                color: background_theme,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8.0),
+                              Text(
+                                entreprise?.nom ?? 'Aucune entreprise active',
+                                style: TextStyle(
+                                  color: background_theme,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
               const SizedBox(height: 20.0),
               Expanded(
                 child: Padding(
@@ -68,7 +129,10 @@ class _HomePageState extends ConsumerState<HomePage> {
                       const SizedBox(height: 20.0),
                       const Text(
                         'Arrivage',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       SizedBox(
                         height: 120,
@@ -88,7 +152,10 @@ class _HomePageState extends ConsumerState<HomePage> {
                       const SizedBox(height: 20.0),
                       const Text(
                         'Dernières ventes',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       const SizedBox(height: 8),
                       Expanded(
@@ -96,13 +163,13 @@ class _HomePageState extends ConsumerState<HomePage> {
                           physics: const AlwaysScrollableScrollPhysics(),
                           children: List.generate(7, (i) {
                             final random = Random().nextInt(100);
-                            final prix = Random().nextInt(5000)*100;
+                            final prix = Random().nextInt(5000) * 100;
 
                             return ProduitVendu(
-                              product: 'product ${i+1}', 
-                              quantity: random, 
-                              date: '10/06/2025', 
-                              amount: prix
+                              product: 'product ${i + 1}',
+                              quantity: random,
+                              date: '10/06/2025',
+                              amount: prix,
                             );
                           }),
                         ),
