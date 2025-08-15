@@ -3,12 +3,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:project6/controller/auth_controller.dart';
 import 'package:project6/controller/entreprise_controller.dart';
 import 'package:project6/models/user_model.dart';
+import 'package:project6/page/%20historique_stock/historique_stock.dart';
+import 'package:project6/page/cat_prod.dart/cat_prod_list.dart';
 import 'package:project6/page/client_page.dart';
+import 'package:project6/page/command/command_list.dart';
 import 'package:project6/page/fournisseur/fournisseur_list.dart';
 import 'package:project6/page/home_page.dart';
+import 'package:project6/page/produit/produit_list.dart';
 import 'package:project6/page/produit_page.dart';
 import 'package:project6/page/vente_page.dart';
 import 'package:project6/utils/constant.dart';
+import 'package:project6/widget/client_list.dart';
 
 class AppDrawer extends ConsumerWidget {
   final User user;
@@ -121,11 +126,11 @@ class AppDrawer extends ConsumerWidget {
                     context,
                     const Icon(Icons.inventory_2_outlined, color: color_white),
                     'Produit',
-                    const ProduitPage(),
+                    const ProduitList(),
                   ),
                   ListDrawer(
                     context,
-                    const Icon(Icons.inventory_2_outlined, color: color_white),
+                    const Icon(Icons.list_alt_rounded, color: color_white),
                     'Commande',
                     const ProduitPage(),
                   ),
@@ -143,9 +148,21 @@ class AppDrawer extends ConsumerWidget {
                   ),
                   ListDrawer(
                     context,
-                    const Icon(Icons.people, color: color_white),
+                    const Icon(Icons.warehouse, color: color_white),
                     'Fournisseur',
                     const FournisseurList(),
+                  ),
+                   ListDrawer(
+                    context,
+                    const Icon(Icons.category_outlined, color: color_white),
+                    'Catégorie produit',
+                    const CategorieProduitList(),
+                  ),
+                  ListDrawer(
+                    context,
+                    const Icon(Icons.menu_book_sharp, color: color_white),
+                    'Historique des stock',
+                    const HistoriqueStockList(),
                   ),
                   ListDrawer(
                     context,

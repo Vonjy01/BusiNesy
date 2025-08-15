@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 class DatabaseHelper {
   static const String _dbName = 'Gestock.db';
   static const int _dbVersion = 4;
+  
 
   DatabaseHelper._privateConstructor();
   static final DatabaseHelper instance = DatabaseHelper._privateConstructor();

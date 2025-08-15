@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:project6/widget/generic_tabview.dart';
-import 'package:project6/widget/produit_list.dart';
+import 'package:project6/widget/produit_item.dart';
 
 class ProduitPage extends StatelessWidget {
   const ProduitPage({super.key});
@@ -10,7 +10,7 @@ class ProduitPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return const GenericTabView(
       headerTitle: 'Liste des produits',
-      tabTitles: ['Tous','Arrivage', 'Stock bas'],
+      tabTitles: ['Tous','Arrivage', 'Stock epuisé'],
       tabViews: [
         InventoryList(),
         OutOfStockList(),
@@ -30,25 +30,25 @@ class InventoryList extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 20.0),
       children: const [
-        InventoryItem(
+        ProduitItem(
           name: 'T-Shirt Blanc',
           prix: '15000',
           currentStock: 42,
           threshold: 5,
         ),
-        InventoryItem(
+        ProduitItem(
           name: 'Jean Slim Noir',
           prix: '20000',
           currentStock: 15,
           threshold: 4,
         ),
-        InventoryItem(
+        ProduitItem(
           name: 'Chaussures de Sport',
           prix: '30000',
           currentStock: 8,
           threshold: 3,
         ),
-        InventoryItem(
+        ProduitItem(
           name: 'Casquette Baseball',
           prix: '15000',
           isLowStock: true,
@@ -68,14 +68,14 @@ class LowStockList extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: const [
-        InventoryItem(
+        ProduitItem(
           name: 'Casquette Baseball',
           prix: '20000',
           currentStock: 3,
           threshold: 5,
           isLowStock: true,
         ),
-        InventoryItem(
+        ProduitItem(
           name: 'Chaussures de Sport',
           prix: '12000',
           currentStock: 2,

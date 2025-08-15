@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:project6/controller/auth_controller.dart';
 import 'package:project6/controller/entreprise_controller.dart';
 import 'package:project6/page/home_page.dart';
 

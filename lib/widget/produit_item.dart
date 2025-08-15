@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:project6/utils/constant.dart';
 
-class InventoryItem extends StatelessWidget {
+class ProduitItem extends StatelessWidget {
   final String name;
   final String prix;
   final int currentStock;
   final int threshold;
   final bool isLowStock;
 
-  const InventoryItem({
+  const ProduitItem({
     super.key,
     required this.name,
     required this.prix,
