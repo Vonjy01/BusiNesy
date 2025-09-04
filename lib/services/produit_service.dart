@@ -22,7 +22,8 @@ class ProduitService {
       'id': produit.id,
       'nom': produit.nom,
       'stock': produit.stock,
-      'prix_unitaire': produit.prixUnitaire,
+      'prix_vente': produit.prixVente,
+      'prix_achat': produit.prixAchat,
       'benefice': null, // Ajouté pour correspondre au schéma
       'entreprise_id': produit.entrepriseId,
       'created_at': DateTime.now().toIso8601String(),

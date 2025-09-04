@@ -2,18 +2,22 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:project6/controller/entreprise_controller.dart';
 import 'package:project6/models/entreprise_model.dart';
 
-final activeEntrepriseProvider = Provider<AsyncValue<Entreprise?>>((ref) {
+// CHANGEZ CE PROVIDER POUR QU'IL SOIT UN FutureProvider<Entreprise?>
+final activeEntrepriseProvider = FutureProvider<Entreprise?>((ref) {
   final entreprisesAsync = ref.watch(entrepriseControllerProvider);
   
   return entreprisesAsync.when(
-    loading: () => const AsyncLoading<Entreprise?>(),
-    error: (err, stack) => AsyncError<Entreprise?>(err, stack),
+    loading: () => null,
+    error: (err, stack) => throw err,
     data: (entreprises) {
+      if (entreprises.isEmpty) return null;
+      
       final active = entreprises.firstWhere(
         (e) => e.isActive,
-        orElse: () => entreprises.isNotEmpty ? entreprises.first : throw Exception('Aucune entreprise'),
+        orElse: () => entreprises.first,
       );
-      return AsyncData<Entreprise?>(active);
+      
+      return active;
     },
   );
 });

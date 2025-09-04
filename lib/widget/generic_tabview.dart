@@ -1,3 +1,4 @@
+// generic_tabview.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:project6/controller/auth_controller.dart';
@@ -52,11 +53,13 @@ class GenericTabView extends ConsumerWidget {
                   ],
                 ),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start, // ← AJOUTEZ CETTE LIGNE
                   children: [
                     Material(
                       color: Colors.transparent,
                       elevation: 0,
                       child: TabBar(
+                        isScrollable: true,
                         labelColor: background_theme,
                         unselectedLabelColor: Colors.grey,
                         indicator: const BoxDecoration(
@@ -66,7 +69,12 @@ class GenericTabView extends ConsumerWidget {
                         ),
                         overlayColor: MaterialStateProperty.all(Colors.transparent),
                         dividerColor: Colors.transparent,
-                        tabs: tabTitles.map((title) => Tab(text: title)).toList(),
+                        tabs: tabTitles.map((title) => Tab(
+                          child: Align( // ← AJOUTEZ CET ALIGN
+                            alignment: Alignment.centerLeft,
+                            child: Text(title),
+                          ),
+                        )).toList(),
                       ),
                     ),
                   ],

@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:project6/controller/cat_prod_controller.dart';
 import 'package:project6/controller/produit_controller.dart';
 import 'package:project6/models/produits_model.dart';
-import 'package:project6/models/categorie_produit_model.dart';
 import 'package:project6/provider/entreprise_provider.dart';
 import 'package:uuid/uuid.dart';
 
@@ -20,7 +19,8 @@ class ProduitDialog extends ConsumerStatefulWidget {
 class _ProduitDialogState extends ConsumerState<ProduitDialog> {
   final _formKey = GlobalKey<FormState>();
   final _nomController = TextEditingController();
-  final _prixController = TextEditingController();
+  final _prixVenteController = TextEditingController();
+  final _prixAchatController = TextEditingController();
   final _stockController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _beneficeController = TextEditingController();
@@ -41,7 +41,8 @@ class _ProduitDialogState extends ConsumerState<ProduitDialog> {
     if (widget.produit != null) {
       // Remplissage des valeurs existantes pour modification
       _nomController.text = widget.produit!.nom;
-      _prixController.text = widget.produit!.prixUnitaire.toString();
+      _prixVenteController.text = widget.produit!.prixVente.toString();
+      _prixAchatController.text = widget.produit!.prixAchat.toString();
       _stockController.text = widget.produit!.stock.toString();
       _defectueuxController.text = widget.produit!.defectueux.toString();
       _beneficeController.text = widget.produit!.benefice?.toString() ?? '';
@@ -54,7 +55,8 @@ class _ProduitDialogState extends ConsumerState<ProduitDialog> {
   @override
   void dispose() {
     _nomController.dispose();
-    _prixController.dispose();
+    _prixVenteController.dispose();
+    _prixAchatController.dispose();
     _stockController.dispose();
     _descriptionController.dispose();
     _beneficeController.dispose();
@@ -91,10 +93,28 @@ class _ProduitDialogState extends ConsumerState<ProduitDialog> {
               ),
               const SizedBox(height: 16),
               TextFormField(
-                controller: _prixController,
+                controller: _prixVenteController,
                 keyboardType: TextInputType.numberWithOptions(decimal: true),
                 decoration: const InputDecoration(
-                  labelText: 'Prix unitaire *',
+                  labelText: 'Prix de vente ',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Ce champ est obligatoire';
+                  }
+                  if (double.tryParse(value) == null) {
+                    return 'Veuillez entrer un nombre valide';
+                  }
+                  return null;
+                },
+              ),
+               const SizedBox(height: 16),
+              TextFormField(
+                controller: _prixAchatController,
+                keyboardType: TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  labelText: 'Prix d\'achat ',
                   border: OutlineInputBorder(),
                 ),
                 validator: (value) {
@@ -259,7 +279,8 @@ class _ProduitDialogState extends ConsumerState<ProduitDialog> {
         id: isEditing ? widget.produit!.id : _uuid.v4(),
         nom: _nomController.text.trim(),
         stock: int.parse(_stockController.text),
-        prixUnitaire: double.parse(_prixController.text),
+        prixVente: double.parse(_prixVenteController.text),
+        prixAchat: double.parse(_prixAchatController.text),
         description: _descriptionController.text.trim(),
         defectueux: int.parse(_defectueuxController.text.isEmpty ? '0' : _defectueuxController.text),
         seuilAlerte: int.parse(_seuilAlerteController.text),

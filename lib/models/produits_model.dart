@@ -2,7 +2,8 @@ class Produit {
   final String id;
   final String nom;
   final int stock;
-  final double prixUnitaire;
+  final double prixVente;
+  final double prixAchat;
   final double? benefice;
   final String? description;
   final int defectueux;
@@ -16,7 +17,8 @@ class Produit {
     required this.id,
     required this.nom,
     required this.stock,
-    required this.prixUnitaire,
+    required this.prixVente,
+    required this.prixAchat,
     this.benefice,
     this.description,
     required this.defectueux,
@@ -35,7 +37,8 @@ class Produit {
       id: map['id'],
       nom: map['nom'],
       stock: map['stock'],
-      prixUnitaire: map['prix_unitaire'],
+      prixVente: map['prix_vente'],
+      prixAchat: map['prix_achat'],
       benefice: map['benefice'],
       description: map['description'],
       defectueux: map['defectueux'] as int? ?? 0,
@@ -56,7 +59,8 @@ class Produit {
       'id': id,
       'nom': nom,
       'stock': stock,
-      'prix_unitaire': prixUnitaire,
+      'prix_vente': prixVente,
+      'prix_achat': prixAchat,
       'benefice': benefice,
       'description': description,
       'defectueux': defectueux,
@@ -71,7 +75,8 @@ class Produit {
   Produit copyWith({
     String? nom,
     int? stock,
-    double? prixUnitaire,
+    double? prixVente,
+    double? prixAchat,
     double? benefice,
     String? description,
     int? defectueux,
@@ -83,7 +88,8 @@ class Produit {
       id: id,
       nom: nom ?? this.nom,
       stock: stock ?? this.stock,
-      prixUnitaire: prixUnitaire ?? this.prixUnitaire,
+      prixVente: prixVente ?? this.prixVente,
+      prixAchat: prixAchat ?? this.prixAchat,
       benefice: benefice ?? this.benefice,
       description: description ?? this.description,
       defectueux: defectueux ?? this.defectueux,

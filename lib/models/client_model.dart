@@ -1,5 +1,5 @@
 class Client {
-  final int? id;
+  final String id; // <-- String au lieu de int?
   final String nom;
   final String? telephone;
   final String? email;
@@ -10,7 +10,7 @@ class Client {
   final DateTime? updatedAt;
 
   Client({
-    this.id,
+    required this.id, // <-- plus de nullable
     required this.nom,
     this.telephone,
     this.email,
@@ -37,7 +37,7 @@ class Client {
 
   factory Client.fromMap(Map<String, dynamic> map) {
     return Client(
-      id: map['id'] as int?,
+      id: map['id'] as String,   // <-- String
       nom: map['nom'] as String,
       telephone: map['telephone'] as String?,
       email: map['email'] as String?,
@@ -45,33 +45,9 @@ class Client {
       entrepriseId: map['entreprise_id'] as String,
       description: map['description'] as String?,
       createdAt: DateTime.parse(map['created_at'] as String),
-      updatedAt: map['updated_at'] != null 
-          ? DateTime.parse(map['updated_at'] as String) 
+      updatedAt: map['updated_at'] != null
+          ? DateTime.parse(map['updated_at'] as String)
           : null,
-    );
-  }
-
-  Client copyWith({
-    int? id,
-    String? nom,
-    String? telephone,
-    String? email,
-    String? adresse,
-    String? entrepriseId,
-    String? description,
-    DateTime? createdAt,
-    DateTime? updatedAt,
-  }) {
-    return Client(
-      id: id ?? this.id,
-      nom: nom ?? this.nom,
-      telephone: telephone ?? this.telephone,
-      email: email ?? this.email,
-      adresse: adresse ?? this.adresse,
-      entrepriseId: entrepriseId ?? this.entrepriseId,
-      description: description ?? this.description,
-      createdAt: createdAt ?? this.createdAt,
-      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 }

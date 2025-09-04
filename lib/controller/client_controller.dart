@@ -1,63 +1,149 @@
+// controller/client_controller.dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:project6/controller/auth_controller.dart';
 import 'package:project6/models/client_model.dart';
-import 'package:project6/provider/client_provider.dart';
-import 'package:project6/services/client_service.dart';
+import 'package:project6/services/database_helper.dart';
+import 'package:uuid/uuid.dart';
 
-final clientServiceProvider = Provider<ClientService>((ref) {
-  final dbHelper = ref.read(databaseHelperProvider);
-  return ClientService(dbHelper);
-});
+final clientControllerProvider = AsyncNotifierProvider<ClientController, List<Client>>(
+  ClientController.new,
+);
 
-final clientControllerProvider = StateNotifierProvider<ClientController, AsyncValue<List<Client>>>((ref) {
-  final authState = ref.watch(authControllerProvider);
-  final entrepriseId = authState.value?.id ?? '';
-  final service = ref.read(clientServiceProvider);
-  return ClientController(service, entrepriseId);
-});
+class ClientController extends AsyncNotifier<List<Client>> {
+  final DatabaseHelper _dbHelper = DatabaseHelper.instance;
+  final Uuid _uuid = const Uuid();
 
-class ClientController extends StateNotifier<AsyncValue<List<Client>>> {
-  final ClientService _service;
-  final String _entrepriseId;
-
-  ClientController(this._service, this._entrepriseId) : super(const AsyncValue.loading()) {
-    _loadClients();
+  @override
+  Future<List<Client>> build() async {
+    return await _loadClients();
   }
 
-  Future<void> _loadClients() async {
-    state = const AsyncValue.loading();
-    try {
-      final clients = await _service.getAll(_entrepriseId);
-      state = AsyncValue.data(clients);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-    }
+  Future<List<Client>> _loadClients({String? entrepriseId}) async {
+    final db = await _dbHelper.database;
+    final where = entrepriseId != null ? 'entreprise_id = ?' : null;
+    final whereArgs = entrepriseId != null ? [entrepriseId] : null;
+    
+    final clients = await db.query(
+      'clients',
+      where: where,
+      whereArgs: whereArgs,
+      orderBy: 'nom ASC',
+    );
+
+    return clients.map(Client.fromMap).toList();
   }
 
-  Future<void> addClient(Client client) async {
+  Future<void> addClient({
+    required String nom,
+    required String entrepriseId,
+    String? telephone,
+    String? email,
+    String? adresse,
+    String? description,
+  }) async {
     try {
-      await _service.create(client);
-      await _loadClients();
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
+      state = const AsyncValue.loading();
+      final db = await _dbHelper.database;
+
+      final client = Client(
+        id: _uuid.v4(),
+        nom: nom.trim(),
+        telephone: telephone?.trim(),
+        email: email?.trim(),
+        adresse: adresse?.trim(),
+        entrepriseId: entrepriseId,
+        description: description?.trim(),
+        createdAt: DateTime.now(),
+      );
+
+      await db.insert('clients', client.toMap());
+      state = await AsyncValue.guard(() => _loadClients(entrepriseId: entrepriseId));
+    } catch (e, stack) {
+      state = AsyncValue.error(e, stack);
+      rethrow;
     }
   }
 
   Future<void> updateClient(Client client) async {
     try {
-      await _service.update(client);
-      await _loadClients();
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
+      state = const AsyncValue.loading();
+      final db = await _dbHelper.database;
+
+      final updatedClient = client.copyWith(
+        updatedAt: DateTime.now(),
+      );
+
+      await db.update(
+        'clients',
+        updatedClient.toMap(),
+        where: 'id = ?',
+        whereArgs: [client.id],
+      );
+
+      state = await AsyncValue.guard(() => _loadClients(entrepriseId: client.entrepriseId));
+    } catch (e, stack) {
+      state = AsyncValue.error(e, stack);
+      rethrow;
     }
   }
 
-  Future<void> deleteClient(int id) async {
+  Future<void> deleteClient(String id, String entrepriseId) async {
     try {
-      await _service.delete(id);
-      await _loadClients();
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
+      state = const AsyncValue.loading();
+      final db = await _dbHelper.database;
+
+      await db.update(
+        'ventes',
+        {'client_id': null},
+        where: 'client_id = ?',
+        whereArgs: [id],
+      );
+
+      await db.delete(
+        'clients',
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+
+      state = await AsyncValue.guard(() => _loadClients(entrepriseId: entrepriseId));
+    } catch (e, stack) {
+      state = AsyncValue.error(e, stack);
+      rethrow;
     }
+  }
+
+  Future<Client?> getClientById(String id) async {
+    final db = await _dbHelper.database;
+    final result = await db.query(
+      'clients',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+
+    return result.isEmpty ? null : Client.fromMap(result.first);
+  }
+}
+
+// Extension pour Client
+extension ClientCopyWith on Client {
+  Client copyWith({
+    String? nom,
+    String? telephone,
+    String? email,
+    String? adresse,
+    String? description,
+    DateTime? updatedAt,
+  }) {
+    return Client(
+      id: id,
+      nom: nom ?? this.nom,
+      telephone: telephone ?? this.telephone,
+      email: email ?? this.email,
+      adresse: adresse ?? this.adresse,
+      entrepriseId: entrepriseId,
+      description: description ?? this.description,
+      createdAt: createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
   }
 }

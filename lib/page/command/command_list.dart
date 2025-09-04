@@ -1,168 +1,357 @@
-// import 'package:flutter/material.dart';
-// import 'package:flutter_riverpod/flutter_riverpod.dart';
-// import 'package:project6/controller/auth_controller.dart';
-// import 'package:project6/controller/command_controller.dart';
-// import 'package:project6/models/command_model.dart';
-// import 'package:project6/page/command/add_command_dialog.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:project6/controller/auth_controller.dart';
+import 'package:project6/controller/command_controller.dart';
+import 'package:project6/controller/entreprise_controller.dart';
+import 'package:project6/controller/fournisseur_controller.dart';
+import 'package:project6/controller/produit_controller.dart';
+import 'package:project6/models/command_model.dart';
+import 'package:project6/models/etat_commande.dart';
+import 'package:project6/models/fournisseur_model.dart';
+import 'package:project6/models/produits_model.dart';
+import 'package:project6/page/command/command_dialog.dart';
 
+import 'package:project6/provider/etat_commande_provider.dart';
+import 'package:project6/utils/constant.dart';
+import 'package:project6/widget/Header.dart';
+import 'package:project6/widget/app_drawer.dart';
+import 'package:project6/widget/generic_tabview.dart';
 
-// class CommandList extends ConsumerWidget {
-//   const CommandList({super.key});
+class CommandList extends ConsumerStatefulWidget {
+  const CommandList({Key? key}) : super(key: key);
 
-//   @override
-//   Widget build(BuildContext context, WidgetRef ref) {
-//     final commandesAsync = ref.watch(commandeControllerProvider);
-    
-//     return Scaffold(
-//       appBar: AppBar(title: const Text('Gestion des Commandes')),
-//       body: commandesAsync.when(
-//         loading: () => const Center(child: CircularProgressIndicator()),
-//         error: (err, stack) => Center(child: Text('Erreur: $err')),
-//         data: (commandes) {
-//           if (commandes.isEmpty) {
-//             return const Center(child: Text('Aucune commande enregistrée'));
-//           }
-          
-//           return ListView.builder(
-//             itemCount: commandes.length,
-//             itemBuilder: (context, index) {
-//               final commande = commandes[index];
-//               return Card(
-//                 child: ListTile(
-//                   title: Text('Commande #${commande.id.substring(0, 6)}'),
-//                   subtitle: Column(
-//                     crossAxisAlignment: CrossAxisAlignment.start,
-//                     children: [
-//                       Text('Produit: ${commande.produitId}'),
-//                       Text('Quantité: ${commande.quantiteCommandee}'),
-//                       if (commande.quantiteRecue != null)
-//                         Text('Reçu: ${commande.quantiteRecue}'),
-//                     ],
-//                   ),
-//                   trailing: _buildEtatChip(commande.etat),
-//                   onTap: () => _showDetails(context, ref, commande),
-//                 ),
-//               );
-//             },
-//           );
-//         },
-//       ),
-//       floatingActionButton: FloatingActionButton(
-//         onPressed: () => _showAddCommandeDialog(context, ref),
-//         child: const Icon(Icons.add),
-//       ),
-//     );
-//   }
+  @override
+  ConsumerState<CommandList> createState() => _CommandListState();
+}
 
-//   Widget _buildEtatChip(int etat) {
-//     final colors = {
-//       1: Colors.orange, // En attente
-//       2: Colors.green,  // Reçu
-//       3: Colors.blue,   // Incomplète
-//       4: Colors.red,    // Annuler
-//     };
-    
-//     return Chip(
-//       label: Text('État $etat'),
-//       backgroundColor: colors[etat]?.withOpacity(0.2),
-//       labelStyle: TextStyle(color: colors[etat]),
-//     );
-//   }
+class _CommandListState extends ConsumerState<CommandList> {
+  @override
+  Widget build(BuildContext context) {
+    final authState = ref.watch(authControllerProvider);
+    final activeEntrepriseState = ref.watch(activeEntrepriseProvider);
+    final etatsCommandeState = ref.watch(etatCommandeProvider);
 
-//   void _showDetails(BuildContext context, WidgetRef ref, Commande commande) {
-//     showDialog(
-//       context: context,
-//       builder: (context) {
-//         return AlertDialog(
-//           title: Text('Détails Commande #${commande.id.substring(0, 6)}'),
-//           content: Column(
-//             mainAxisSize: MainAxisSize.min,
-//             crossAxisAlignment: CrossAxisAlignment.start,
-//             children: [
-//               Text('Fournisseur: ${commande.fournisseurId}'),
-//               Text('Produit: ${commande.produitId}'),
-//               Text('Quantité commandée: ${commande.quantiteCommandee}'),
-//               if (commande.quantiteRecue != null)
-//                 Text('Quantité reçue: ${commande.quantiteRecue}'),
-// Text('Prix unitaire: ${(commande.prixUnitaire ?? 0).toStringAsFixed(2)}'),
-//               Text('Date commande: ${commande.dateCommande.toString()}'),
-//               if (commande.dateArrivee != null)
-//                 Text('Date réception: ${commande.dateArrivee.toString()}'),
-//             ],
-//           ),
-//           actions: [
-//             if (commande.etat == 1) // En attente
-//               TextButton(
-//                 onPressed: () => _showValidateDialog(context, ref, commande),
-//                 child: const Text('Valider réception'),
-//               ),
-//             TextButton(
-//               onPressed: () => Navigator.pop(context),
-//               child: const Text('Fermer'),
-//             ),
-//           ],
-//         );
-//       },
-//     );
-//   }
+    return authState.when(
+      loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
+      error: (error, stack) => Scaffold(body: Center(child: Text('Erreur: $error'))),
+      data: (user) {
+        if (user == null) return const Scaffold(body: Center(child: Text('Utilisateur non connecté')));
 
-//   void _showValidateDialog(BuildContext context, WidgetRef ref, Commande commande) {
-//     final quantiteController = TextEditingController(
-//       text: commande.quantiteCommandee.toString(),
-//     );
-    
-//     showDialog(
-//       context: context,
-//       builder: (context) {
-//         return AlertDialog(
-//           title: const Text('Valider la réception'),
-//           content: TextField(
-//             controller: quantiteController,
-//             keyboardType: TextInputType.number,
-//             decoration: const InputDecoration(
-//               labelText: 'Quantité reçue',
-//               hintText: 'Entrez la quantité effectivement reçue',
-//             ),
-//           ),
-//           actions: [
-//             TextButton(
-//               onPressed: () => Navigator.pop(context),
-//               child: const Text('Annuler'),
-//             ),
-//             TextButton(
-//               onPressed: () async {
-//                 final quantite = int.tryParse(quantiteController.text) ?? 0;
-//                 if (quantite > 0) {
-//                   Navigator.pop(context); // Fermer la boîte de dialogue
-//                   Navigator.pop(context); // Fermer les détails
+        return activeEntrepriseState.when(
+          loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
+          error: (error, stack) => Scaffold(body: Center(child: Text('Erreur: $error'))),
+          data: (activeEntreprise) {
+            if (activeEntreprise == null) {
+              return Scaffold(
+                body: Center(child: Text('Aucune entreprise active trouvée')),
+              );
+            }
+
+            return etatsCommandeState.when(
+              loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
+              error: (error, stack) => Scaffold(body: Center(child: Text('Erreur: $error'))),
+              data: (etats) {
+                return Scaffold(
+                  drawer: AppDrawer(user: user),
+                  body: Column(
+                    children: [
                   
-//                   await ref.read(commandeControllerProvider.notifier).validerReception(
-//                     commandeId: commande.id,
-//                     quantiteRecue: quantite,
-//                     userId: 'current-user-id', // À remplacer par l'ID réel
-//                   );
-//                 }
-//               },
-//               child: const Text('Valider'),
-//             ),
-//           ],
-//         );
-//       },
-//     );
-//   }
+                      Expanded(
+                        child: GenericTabView(
+                          headerTitle: 'Liste des commandes',
+                          tabTitles: _buildTabTitles(etats),
+                          tabViews: _buildTabViews(etats, user.id, activeEntreprise.id, ref),
+                          tabBarOffsetY: -40,
+                        ),
+                      ),
+                    ],
+                  ),
+                  floatingActionButton: FloatingActionButton(
+                    onPressed: () => _showAddDialog(context, user.id, activeEntreprise.id, ref),
+                    backgroundColor: background_theme,
+                    child: Icon(Icons.add, color: color_white),
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
 
-// void _showAddCommandeDialog(BuildContext context, WidgetRef ref) {
-//   final entrepriseId = ref.read(authControllerProvider).value?.id ?? '';
-//   if (entrepriseId.isEmpty) {
-//     ScaffoldMessenger.of(context).showSnackBar(
-//       const SnackBar(content: Text('Entreprise non valide')),
-//     );
-//     return;
-//   }
+  List<String> _buildTabTitles(List<EtatCommande> etats) {
+    return ['Toutes', ...etats.map((e) => e.libelle).toList()];
+  }
 
-//   showDialog(
-//     context: context,
-//     builder: (context) => AddCommandeDialog(entrepriseId: entrepriseId),
-//   );
-// }
-// }
+  List<Widget> _buildTabViews(List<EtatCommande> etats, String userId, String entrepriseId, WidgetRef ref) {
+    final allTab = _buildAllCommandesTab(userId, entrepriseId, ref);
+    final etatTabs = etats.map((etat) => 
+      _buildFilteredCommandesTab(userId, entrepriseId, etat.id, ref)
+    ).toList();
+    
+    return [allTab, ...etatTabs];
+  }
+
+  Widget _buildAllCommandesTab(String userId, String entrepriseId, WidgetRef ref) {
+    return Consumer(
+      builder: (context, ref, child) {
+        final commandesState = ref.watch(commandeControllerProvider);
+        final fournisseursState = ref.watch(fournisseurControllerProvider);
+        final produitsState = ref.watch(produitControllerProvider);
+        final etatsState = ref.watch(etatCommandeProvider);
+
+        return commandesState.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (error, stack) => Center(child: Text('Erreur: $error')),
+          data: (commandes) {
+            return fournisseursState.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (error, stack) => Center(child: Text('Erreur: $error')),
+              data: (fournisseurs) {
+                return produitsState.when(
+                  loading: () => const Center(child: CircularProgressIndicator()),
+                  error: (error, stack) => Center(child: Text('Erreur: $error')),
+                  data: (produits) {
+                    return etatsState.when(
+                      loading: () => const Center(child: CircularProgressIndicator()),
+                      error: (error, stack) => Center(child: Text('Erreur: $error')),
+                      data: (etats) {
+                        return _buildCommandeList(
+                          commandes, 
+                          fournisseurs, 
+                          produits,
+                          etats,
+                          userId,
+                          entrepriseId,
+                          ref,
+                        );
+                      },
+                    );
+                  },
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildFilteredCommandesTab(String userId, String entrepriseId, int etatId, WidgetRef ref) {
+    return Consumer(
+      builder: (context, ref, child) {
+        final commandesState = ref.watch(commandeControllerProvider);
+        final fournisseursState = ref.watch(fournisseurControllerProvider);
+        final produitsState = ref.watch(produitControllerProvider);
+        final etatsState = ref.watch(etatCommandeProvider);
+
+        return commandesState.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (error, stack) => Center(child: Text('Erreur: $error')),
+          data: (commandes) {
+            final filteredCommandes = commandes.where((c) => c.etat == etatId).toList();
+            
+            return fournisseursState.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (error, stack) => Center(child: Text('Erreur: $error')),
+              data: (fournisseurs) {
+                return produitsState.when(
+                  loading: () => const Center(child: CircularProgressIndicator()),
+                  error: (error, stack) => Center(child: Text('Erreur: $error')),
+                  data: (produits) {
+                    return etatsState.when(
+                      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, stack) => Center(child: Text('Erreur: $error')),
+      data: (etats) {
+        return _buildCommandeList(
+          filteredCommandes, 
+          fournisseurs, 
+          produits,
+          etats,
+          userId,
+          entrepriseId,
+          ref,
+        );
+      },
+    );
+  },
+);
+},
+);
+},
+);
+},
+);
+}
+}
+Widget _buildCommandeList(
+  List<Commande> commandes, 
+  List<Fournisseur> fournisseurs, 
+  List<Produit> produits,
+  List<EtatCommande> etats,
+  String userId,
+  String entrepriseId,
+  WidgetRef ref,
+) {
+  if (commandes.isEmpty) {
+    return const Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.shopping_cart_outlined, size: 48, color: Colors.grey),
+          SizedBox(height: 16),
+          Text('Aucune commande trouvée', style: TextStyle(color: Colors.grey)),
+        ],
+      ),
+    );
+  }
+
+  return RefreshIndicator(
+    onRefresh: () async => ref.refresh(commandeControllerProvider),
+    child: ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: commandes.length,
+      itemBuilder: (context, index) {
+        final commande = commandes[index];
+        final fournisseur = fournisseurs.firstWhere(
+          (f) => f.id == commande.fournisseurId,
+          orElse: () => Fournisseur(
+            id: '',
+            nom: 'Inconnu',
+            entrepriseId: '',
+            createdAt: DateTime.now(),
+          ),
+        );
+        
+        final produit = produits.firstWhere(
+          (p) => p.id == commande.produitId,
+          orElse: () => Produit(
+            id: '',
+            nom: 'Inconnu',
+            stock: 0,
+            prixVente: 0,
+            prixAchat: 0,
+            defectueux: 0,
+            entrepriseId: '',
+            createdAt: DateTime.now(),
+            seuilAlerte: 5,
+          ),
+        );
+
+        final etat = etats.firstWhere(
+          (e) => e.id == commande.etat,
+          orElse: () => EtatCommande(id: 0, libelle: 'Inconnu'),
+        );
+
+        return GestureDetector(
+          onTap: () => _showEditDialog(context, commande, userId, entrepriseId, ref),
+          child: Card(
+            margin: const EdgeInsets.only(bottom: 16),
+            elevation: 2,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            child: ListTile(
+              contentPadding: const EdgeInsets.all(8),
+              leading: _buildEtatIcon(commande.etat),
+              title: Text(
+                '${produit.nom} (${commande.quantiteCommandee}) ',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 8),
+                  Text( fournisseur.nom),
+                  if (commande.quantiteRecue != null)
+                    Text('Reçue: ${commande.quantiteRecue}'),
+                  if (commande.prixUnitaire != null)
+                  Text(' ${_formatDate(commande.dateCommande)}'),
+                ],
+              ),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.edit, color: Colors.blue),
+                    onPressed: () => _showEditDialog(context, commande, userId, entrepriseId, ref),
+                  ),
+                  
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    ),
+  );
+}
+
+Widget _buildEtatIcon(int etatId) {
+  switch (etatId) {
+    case 1:
+      return const CircleAvatar(
+        backgroundColor: Colors.blue,
+        child: Icon(Icons.access_time, color: Colors.white),
+      );
+    case 2:
+      return const CircleAvatar(
+        backgroundColor: Colors.green,
+        child: Icon(Icons.check, color: Colors.white),
+      );
+    case 3:
+      return const CircleAvatar(
+        backgroundColor: Colors.orange,
+        child: Icon(Icons.warning, color: Colors.white),
+      );
+    case 4:
+      return const CircleAvatar(
+        backgroundColor: Colors.red,
+        child: Icon(Icons.close, color: Colors.white),
+      );
+    default:
+      return const CircleAvatar(
+        backgroundColor: Colors.grey,
+        child: Icon(Icons.help, color: Colors.white),
+      );
+  }
+}
+
+String _formatDate(DateTime date) {
+  return '${date.day}/${date.month}/${date.year}';
+}
+
+void _showAddDialog(BuildContext context, String userId, String entrepriseId, WidgetRef ref) {
+  showDialog(
+    context: context,
+    builder: (context) => CommandeDialog(
+      userId: userId,
+      entrepriseId: entrepriseId,
+    ),
+  ).then((_) => ref.refresh(commandeControllerProvider));
+}
+
+void _showEditDialog(BuildContext context, Commande commande, String userId, String entrepriseId, WidgetRef ref) {
+  showDialog(
+    context: context,
+    builder: (context) => CommandeDialog(
+      commande: commande,
+      userId: userId,
+      entrepriseId: entrepriseId,
+    ),
+  ).then((_) => ref.refresh(commandeControllerProvider));
+}
+
+void _deleteCommande(BuildContext context, String id, WidgetRef ref) async {
+  final controller = ref.read(commandeControllerProvider.notifier);
+  try {
+    await controller.deleteCommande(id);
+    ref.refresh(commandeControllerProvider);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Commande supprimée avec succès')),
+    );
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Erreur lors de la suppression: $e')),
+    );
+  }
+}

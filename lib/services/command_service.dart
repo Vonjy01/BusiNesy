@@ -1,4 +1,5 @@
 import 'package:project6/models/command_model.dart';
+import 'package:project6/models/etat_commande.dart';
 import 'package:project6/services/database_helper.dart';
 
 class CommandeService {

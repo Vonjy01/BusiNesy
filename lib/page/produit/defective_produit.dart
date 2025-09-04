@@ -24,7 +24,7 @@ class DefectiveProductsView extends ConsumerWidget {
         final product = defectiveProducts[index];
         return ProduitItem(
           name: product.nom,
-          prix: product.prixUnitaire.toStringAsFixed(2),
+          prix: product.prixVente.toStringAsFixed(2),
           currentStock: product.defectueux, // Afficher le stock défectueux
           threshold: 1,
           isLowStock: true,

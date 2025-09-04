@@ -1,0 +1,481 @@
+// commande_dialog.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:dropdown_search/dropdown_search.dart';
+import 'package:project6/controller/command_controller.dart';
+import 'package:project6/controller/fournisseur_controller.dart';
+import 'package:project6/controller/produit_controller.dart';
+import 'package:project6/controller/cat_prod_controller.dart';
+import 'package:project6/models/command_model.dart';
+import 'package:project6/models/etat_commande.dart';
+import 'package:project6/models/fournisseur_model.dart';
+import 'package:project6/models/produits_model.dart';
+import 'package:project6/models/categorie_produit_model.dart';
+import 'package:project6/provider/etat_commande_provider.dart';
+import 'package:uuid/uuid.dart';
+
+class CommandeDialog extends ConsumerStatefulWidget {
+  final Commande? commande;
+  final String userId;
+  final String entrepriseId;
+
+  const CommandeDialog({
+    Key? key,
+    this.commande,
+    required this.userId,
+    required this.entrepriseId,
+  }) : super(key: key);
+
+  @override
+  ConsumerState<CommandeDialog> createState() => _CommandeDialogState();
+}
+
+class _CommandeDialogState extends ConsumerState<CommandeDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final Uuid _uuid = const Uuid();
+
+  late String _fournisseurId;
+  late String _produitId;
+  late int _quantiteCommandee;
+  late int? _quantiteRecue;
+  late double? _prixUnitaire;
+  late DateTime _dateCommande;
+  late int _etat;
+  late int? _categorieId;
+
+  List<Fournisseur> _fournisseurs = [];
+  List<Produit> _produits = [];
+  List<Produit> _produitsFiltres = [];
+  List<EtatCommande> _etats = [];
+  List<CategorieProduit> _categories = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _dateCommande = DateTime.now();
+    _etat = 1;
+    _categorieId = null;
+
+    if (widget.commande != null) {
+      _fournisseurId = widget.commande!.fournisseurId;
+      _produitId = widget.commande!.produitId;
+      _quantiteCommandee = widget.commande!.quantiteCommandee;
+      _quantiteRecue = widget.commande!.quantiteRecue;
+      _prixUnitaire = widget.commande!.prixUnitaire;
+      _dateCommande = widget.commande!.dateCommande;
+      _etat = widget.commande!.etat;
+      
+      if (_produitId.isNotEmpty) {
+        _findCategorieFromProduit();
+      }
+    } else {
+      _fournisseurId = '';
+      _produitId = '';
+      _quantiteCommandee = 0;
+      _quantiteRecue = null;
+      _prixUnitaire = null;
+    }
+  }
+
+  void _findCategorieFromProduit() {
+    final produitsState = ref.read(produitControllerProvider);
+    produitsState.when(
+      data: (produits) {
+        final produit = produits.firstWhere(
+          (p) => p.id == _produitId,
+          orElse: () => Produit(
+            id: '', 
+            nom: '', 
+            stock: 0, 
+            prixVente: 0, 
+            prixAchat: 0,
+            defectueux: 0, 
+            entrepriseId: '', 
+            createdAt: DateTime.now(),
+            categorieId: null
+          ),
+        );
+        if (produit.categorieId != null) {
+          setState(() {
+            _categorieId = produit.categorieId;
+          });
+        }
+      },
+      loading: () {},
+      error: (error, stack) {},
+    );
+  }
+
+  void _filtrerProduitsParCategorie(int? categorieId) {
+    setState(() {
+      _categorieId = categorieId;
+      if (categorieId == null) {
+        _produitsFiltres = _produits;
+      } else {
+        _produitsFiltres = _produits.where((produit) => produit.categorieId == categorieId).toList();
+      }
+      if (_produitId.isNotEmpty && !_produitsFiltres.any((p) => p.id == _produitId)) {
+        _produitId = '';
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final fournisseursState = ref.watch(fournisseurControllerProvider);
+    final produitsState = ref.watch(produitControllerProvider);
+    final etatsState = ref.watch(etatCommandeProvider);
+    final categoriesState = ref.watch(categorieProduitControllerProvider);
+
+    return AlertDialog(
+      title: Text(widget.commande == null ? 'Nouvelle Commande' : 'Modifier Commande'),
+      content: SingleChildScrollView(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              etatsState.when(
+                loading: () => const CircularProgressIndicator(),
+                error: (error, stack) => Text('Erreur: $error'),
+                data: (etats) {
+                  _etats = etats;
+                  return DropdownButtonFormField<int>(
+                    value: _etat,
+                    decoration: const InputDecoration(
+                      labelText: 'État',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: etats.map((etat) {
+                      return DropdownMenuItem(
+                        value: etat.id,
+                        child: Text(etat.libelle),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        _etat = value!;
+                      });
+                    },
+                  );
+                },
+              ),
+
+              if (_etat == 2 || _etat == 3) ...[
+                const SizedBox(height: 16),
+                TextFormField(
+                  initialValue: _quantiteRecue?.toString(),
+                  decoration: const InputDecoration(
+                    labelText: 'Quantité reçue *',
+                    border: OutlineInputBorder(),
+                  ),
+                  keyboardType: TextInputType.number,
+                  validator: (value) {
+                    if ((_etat == 2 || _etat == 3) && (value == null || value.isEmpty || int.tryParse(value) == null || int.parse(value) <= 0)) {
+                      return 'Veuillez entrer la quantité reçue';
+                    }
+                    return null;
+                  },
+                  onChanged: (value) {
+                    _quantiteRecue = int.tryParse(value);
+                  },
+                ),
+              ],
+
+              const SizedBox(height: 16),
+
+              fournisseursState.when(
+                loading: () => const CircularProgressIndicator(),
+                error: (error, stack) => Text('Erreur: $error'),
+                data: (fournisseurs) {
+                  _fournisseurs = fournisseurs;
+                  return DropdownSearch<Fournisseur>(
+                    items: _fournisseurs,
+                    selectedItem: _fournisseurs.firstWhere(
+                      (f) => f.id == _fournisseurId,
+                      orElse: () => Fournisseur(id: '', nom: '', entrepriseId: '', createdAt: DateTime.now()),
+                    ),
+                    itemAsString: (Fournisseur f) => f.nom,
+                    popupProps: const PopupProps.menu(
+                      showSearchBox: true,
+                      searchDelay: Duration(milliseconds: 300),
+                    ),
+                    onChanged: (Fournisseur? value) {
+                      setState(() {
+                        _fournisseurId = value?.id ?? '';
+                      });
+                    },
+                    validator: (Fournisseur? value) {
+                      if (value == null) {
+                        return 'Veuillez sélectionner un fournisseur';
+                      }
+                      return null;
+                    },
+                    dropdownDecoratorProps: const DropDownDecoratorProps(
+                      dropdownSearchDecoration: InputDecoration(
+                        labelText: 'Fournisseur *',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  );
+                },
+              ),
+
+              const SizedBox(height: 16),
+
+              categoriesState.when(
+                loading: () => const CircularProgressIndicator(),
+                error: (error, stack) => Text('Erreur: $error'),
+                data: (categories) {
+                  _categories = categories;
+                  return DropdownSearch<CategorieProduit>(
+                    items: _categories,
+                    selectedItem: _categories.firstWhere(
+                      (c) => c.id == _categorieId,
+                      orElse: () => CategorieProduit(
+                        id: null, 
+                        libelle: '', 
+                        entrepriseId: '', 
+                        createdAt: DateTime.now()
+                      ),
+                    ),
+                    itemAsString: (CategorieProduit c) => c.libelle,
+                    popupProps: const PopupProps.menu(
+                      showSearchBox: true,
+                      searchDelay: Duration(milliseconds: 300),
+                    ),
+                    onChanged: (CategorieProduit? value) {
+                      setState(() {
+                        _categorieId = value?.id;
+                      });
+                      _filtrerProduitsParCategorie(value?.id);
+                    },
+                    validator: (CategorieProduit? value) {
+                      if (value == null) {
+                        return 'Veuillez sélectionner une catégorie';
+                      }
+                      return null;
+                    },
+                    dropdownDecoratorProps: const DropDownDecoratorProps(
+                      dropdownSearchDecoration: InputDecoration(
+                        labelText: 'Catégorie *',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  );
+                },
+              ),
+
+              const SizedBox(height: 16),
+
+              produitsState.when(
+                loading: () => const CircularProgressIndicator(),
+                error: (error, stack) => Text('Erreur: $error'),
+                data: (produits) {
+                  _produits = produits;
+                  if (_produitsFiltres.isEmpty) {
+                    _produitsFiltres = produits;
+                  }
+                  
+                  return DropdownSearch<Produit>(
+                    items: _produitsFiltres,
+                    selectedItem: _produitsFiltres.firstWhere(
+                      (p) => p.id == _produitId,
+                      orElse: () => Produit(
+                        id: '', 
+                        nom: '', 
+                        stock: 0, 
+                        prixVente: 0,
+                        prixAchat: 0, 
+                        defectueux: 0, 
+                        entrepriseId: '', 
+                        createdAt: DateTime.now(),
+                        categorieId: null
+                      ),
+                    ),
+                    itemAsString: (Produit p) => p.nom,
+                    popupProps: const PopupProps.menu(
+                      showSearchBox: true,
+                      searchDelay: Duration(milliseconds: 300),
+                    ),
+                    onChanged: (Produit? value) {
+                      setState(() {
+                        _produitId = value?.id ?? '';
+                        if (value != null) {
+                          _categorieId = value.categorieId;
+                        }
+                      });
+                    },
+                    validator: (Produit? value) {
+                      if (value == null) {
+                        return 'Veuillez sélectionner un produit';
+                      }
+                      return null;
+                    },
+                    dropdownDecoratorProps: const DropDownDecoratorProps(
+                      dropdownSearchDecoration: InputDecoration(
+                        labelText: 'Produit *',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  );
+                },
+              ),
+
+              const SizedBox(height: 16),
+
+              TextFormField(
+                initialValue: _quantiteCommandee.toString(),
+                decoration: const InputDecoration(
+                  labelText: 'Quantité commandée *',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.number,
+                validator: (value) {
+                  if (value == null || value.isEmpty || int.tryParse(value) == null || int.parse(value) <= 0) {
+                    return 'Veuillez entrer une quantité valide';
+                  }
+                  return null;
+                },
+                onChanged: (value) {
+                  _quantiteCommandee = int.tryParse(value) ?? 0;
+                },
+              ),
+
+              const SizedBox(height: 16),
+
+              TextFormField(
+                initialValue: _prixUnitaire?.toString(),
+                decoration: const InputDecoration(
+                  labelText: 'Prix unitaire (Optionnel)',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.number,
+                onChanged: (value) {
+                  _prixUnitaire = double.tryParse(value);
+                },
+              ),
+
+              const SizedBox(height: 16),
+
+              InkWell(
+                onTap: () async {
+                  final date = await showDatePicker(
+                    context: context,
+                    initialDate: _dateCommande,
+                    firstDate: DateTime(2000),
+                    lastDate: DateTime(2100),
+                  );
+                  if (date != null) {
+                    setState(() {
+                      _dateCommande = date;
+                    });
+                  }
+                },
+                child: InputDecorator(
+                  decoration: const InputDecoration(
+                    labelText: 'Date de commande',
+                    border: OutlineInputBorder(),
+                  ),
+                  child: Text(_dateCommande.toString().split(' ')[0]),
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              if (widget.commande != null) ...[
+                const SizedBox(height: 20),
+                ElevatedButton(
+                  onPressed: () => _deleteCommande(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Supprimer la commande'),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Annuler'),
+        ),
+        ElevatedButton(
+          onPressed: _saveCommande,
+          child: const Text('Enregistrer'),
+        ),
+      ],
+    );
+  }
+
+  void _saveCommande() async {
+    if (_formKey.currentState!.validate()) {
+      final commandeController = ref.read(commandeControllerProvider.notifier);
+
+      final commande = Commande(
+        id: widget.commande?.id ?? _uuid.v4(),
+        fournisseurId: _fournisseurId,
+        produitId: _produitId,
+        quantiteCommandee: _quantiteCommandee,
+        quantiteRecue: _quantiteRecue,
+        prixUnitaire: _prixUnitaire,
+        dateCommande: _dateCommande,
+        dateArrivee: (_etat == 2 || _etat == 3) ? DateTime.now() : null,
+        etat: _etat,
+        entrepriseId: widget.entrepriseId,
+      );
+
+      try {
+        if (widget.commande == null) {
+          await commandeController.addCommande(commande);
+        } else {
+          await commandeController.updateCommande(commande, widget.userId);
+        }
+        Navigator.of(context).pop();
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur: $e')),
+        );
+      }
+    }
+  }
+
+  void _deleteCommande(BuildContext context) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirmer la suppression'),
+        content: const Text('Êtes-vous sûr de vouloir supprimer cette commande ?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Supprimer'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      final commandeController = ref.read(commandeControllerProvider.notifier);
+      try {
+        await commandeController.deleteCommande(widget.commande!.id);
+        Navigator.of(context).pop();
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur lors de la suppression: $e')),
+        );
+      }
+    }
+  }
+}

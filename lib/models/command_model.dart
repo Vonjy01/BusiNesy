@@ -1,10 +1,11 @@
+// commande_model.dart
 class Commande {
   final String id;
   final String fournisseurId;
   final String produitId;
   final int quantiteCommandee;
   final int? quantiteRecue;
-  final double? prixUnitaire; // Rendons ce champ nullable
+  final double? prixUnitaire;
   final DateTime dateCommande;
   final DateTime? dateArrivee;
   final int etat;
@@ -16,10 +17,10 @@ class Commande {
     required this.produitId,
     required this.quantiteCommandee,
     this.quantiteRecue,
-    this.prixUnitaire, // Maintenant nullable
+    this.prixUnitaire,
     required this.dateCommande,
     this.dateArrivee,
-    this.etat = 1,
+    this.etat = 1, // Par défaut "En attente"
     required this.entrepriseId,
   });
 
@@ -30,7 +31,7 @@ class Commande {
       produitId: map['produit_id'] as String,
       quantiteCommandee: map['quantite_command'] as int,
       quantiteRecue: map['quantite_recu'] as int?,
-      prixUnitaire: map['prix_unitaire'] as double?, // Conversion nullable
+      prixUnitaire: map['prix_unitaire'] as double?,
       dateCommande: DateTime.parse(map['date_commande'] as String),
       dateArrivee: map['date_arrivee'] != null 
           ? DateTime.parse(map['date_arrivee'] as String) 
@@ -47,25 +48,37 @@ class Commande {
       'produit_id': produitId,
       'quantite_command': quantiteCommandee,
       'quantite_recu': quantiteRecue,
-      'prix_unitaire': prixUnitaire, // Peut être null
+      'prix_unitaire': prixUnitaire,
       'date_commande': dateCommande.toIso8601String(),
       'date_arrivee': dateArrivee?.toIso8601String(),
       'etat': etat,
       'entreprise_id': entrepriseId,
     };
   }
-}
 
-class EtatCommande {
-  final int id;
-  final String libelle;
-
-  EtatCommande({required this.id, required this.libelle});
-
-  factory EtatCommande.fromMap(Map<String, dynamic> map) {
-    return EtatCommande(
-      id: map['id'] as int,
-      libelle: map['libelle'] as String,
+  Commande copyWith({
+    String? fournisseurId,
+    String? produitId,
+    int? quantiteCommandee,
+    int? quantiteRecue,
+    double? prixUnitaire,
+    DateTime? dateCommande,
+    DateTime? dateArrivee,
+    int? etat,
+    String? entrepriseId,
+  }) {
+    return Commande(
+      id: id,
+      fournisseurId: fournisseurId ?? this.fournisseurId,
+      produitId: produitId ?? this.produitId,
+      quantiteCommandee: quantiteCommandee ?? this.quantiteCommandee,
+      quantiteRecue: quantiteRecue ?? this.quantiteRecue,
+      prixUnitaire: prixUnitaire ?? this.prixUnitaire,
+      dateCommande: dateCommande ?? this.dateCommande,
+      dateArrivee: dateArrivee ?? this.dateArrivee,
+      etat: etat ?? this.etat,
+      entrepriseId: entrepriseId ?? this.entrepriseId,
     );
   }
 }
+

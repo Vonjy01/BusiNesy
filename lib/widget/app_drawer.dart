@@ -5,15 +5,14 @@ import 'package:project6/controller/entreprise_controller.dart';
 import 'package:project6/models/user_model.dart';
 import 'package:project6/page/%20historique_stock/historique_stock.dart';
 import 'package:project6/page/cat_prod.dart/cat_prod_list.dart';
-import 'package:project6/page/client_page.dart';
+import 'package:project6/page/client/client_list.dart';
 import 'package:project6/page/command/command_list.dart';
 import 'package:project6/page/fournisseur/fournisseur_list.dart';
 import 'package:project6/page/home_page.dart';
 import 'package:project6/page/produit/produit_list.dart';
-import 'package:project6/page/produit_page.dart';
-import 'package:project6/page/vente_page.dart';
+import 'package:project6/page/vente/vente_list.dart';
 import 'package:project6/utils/constant.dart';
-import 'package:project6/widget/client_list.dart';
+
 
 class AppDrawer extends ConsumerWidget {
   final User user;
@@ -132,19 +131,19 @@ class AppDrawer extends ConsumerWidget {
                     context,
                     const Icon(Icons.list_alt_rounded, color: color_white),
                     'Commande',
-                    const ProduitPage(),
+                    const CommandList(),
                   ),
                   ListDrawer(
                     context,
                     const Icon(Icons.point_of_sale, color: color_white),
                     'Vente',
-                    const VentePage(),
+                    const VenteList(),
                   ),
                   ListDrawer(
                     context,
                     const Icon(Icons.people, color: color_white),
                     'Clients',
-                    const ClientPage(),
+                    const ClientList(),
                   ),
                   ListDrawer(
                     context,
