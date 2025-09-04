@@ -60,28 +60,56 @@ class _VenteDialogState extends ConsumerState<VenteDialog> {
   final TextEditingController _prixUnitaireController = TextEditingController();
   final TextEditingController _beneficeController = TextEditingController();
 
-  @override
-  void initState() {
-    super.initState();
-    _dateVente = DateTime.now();
-    _etat = 1;
-    _montantPaye = 0;
-    _clientId = '';
+@override
+void initState() {
+  super.initState();
+  _dateVente = DateTime.now();
+  _etat = 1;
+  _montantPaye = 0;
+  _clientId = '';
 
-    _quantiteController.text = '1';
-    _produitRevenuController.text = '0';
-    _prixUnitaireController.text = '0';
-    _beneficeController.text = '0';
-
-    if (widget.vente != null) {
-      _clientId = widget.vente!.clientId ?? '';
-      _montantPaye = widget.vente!.montantPaye;
-      _dateVente = widget.vente!.dateVente;
-      _etat = widget.vente!.etat;
-      _description = widget.vente!.description ?? '';
-    }
+  if (widget.vente != null) {
+    _clientId = widget.vente!.clientId ?? '';
+    _montantPaye = widget.vente!.montantPaye;
+    _dateVente = widget.vente!.dateVente;
+    _etat = widget.vente!.etat;
+    _description = widget.vente!.description ?? '';
+    
+    // Charger le produit existant pour la modification
+    _loadExistingVente();
   }
+}
 
+void _loadExistingVente() {
+  // Pour la modification, ajouter le produit existant à la liste
+  if (widget.vente != null) {
+    final item = VenteItem(
+      id: widget.vente!.id,
+      produitId: widget.vente!.produitId,
+      produitNom: 'Produit à charger', // Vous devrez récupérer le nom réel
+      quantite: widget.vente!.quantite,
+      produitRevenu: widget.vente!.produitRevenu,
+      prixUnitaire: widget.vente!.prixUnitaire,
+      benefice: widget.vente!.benefice,
+      prixTotal: widget.vente!.prixTotal,
+      beneficeTotal: widget.vente!.benefice,
+    );
+    
+    _venteItems.add(item);
+    
+    // Pré-remplir les champs
+    _currentProduitId = widget.vente!.produitId;
+    _currentQuantite = widget.vente!.quantite;
+    _currentProduitRevenu = widget.vente!.produitRevenu;
+    _currentPrixUnitaire = widget.vente!.prixUnitaire;
+    _currentBenefice = widget.vente!.benefice;
+    
+    _quantiteController.text = _currentQuantite.toString();
+    _produitRevenuController.text = _currentProduitRevenu.toString();
+    _prixUnitaireController.text = _currentPrixUnitaire.toStringAsFixed(2);
+    _beneficeController.text = _currentBenefice.toStringAsFixed(2);
+  }
+}
   @override
   void dispose() {
     _quantiteController.dispose();

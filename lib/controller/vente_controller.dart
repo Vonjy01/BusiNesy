@@ -89,7 +89,11 @@ class VenteController extends AsyncNotifier<List<Vente>> {
       state = AsyncValue.error(e, stack);
       rethrow;
     }
-  }
+  }// Ajoutez cette méthode à votre VenteController
+Future<Map<String, List<Vente>>> getVentesGrouped() async {
+  final ventes = await loadVentes();
+  return groupVentesByClientAndDate(ventes);
+}
 
   Future<void> updateVenteEtat(String venteId, int newEtat, String userId) async {
     try {
