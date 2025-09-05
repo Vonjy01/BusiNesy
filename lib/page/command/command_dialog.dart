@@ -12,6 +12,9 @@ import 'package:project6/models/fournisseur_model.dart';
 import 'package:project6/models/produits_model.dart';
 import 'package:project6/models/categorie_produit_model.dart';
 import 'package:project6/provider/etat_commande_provider.dart';
+import 'package:project6/utils/constant.dart';
+import 'package:project6/utils/message_text.dart';
+import 'package:project6/widget/message_widget.dart';
 import 'package:uuid/uuid.dart';
 
 class CommandeDialog extends ConsumerStatefulWidget {
@@ -33,6 +36,7 @@ class CommandeDialog extends ConsumerStatefulWidget {
 class _CommandeDialogState extends ConsumerState<CommandeDialog> {
   final _formKey = GlobalKey<FormState>();
   final Uuid _uuid = const Uuid();
+late TextEditingController _prixController;
 
   late String _fournisseurId;
   late String _produitId;
@@ -48,33 +52,45 @@ class _CommandeDialogState extends ConsumerState<CommandeDialog> {
   List<Produit> _produitsFiltres = [];
   List<EtatCommande> _etats = [];
   List<CategorieProduit> _categories = [];
+@override
+void initState() {
+  super.initState();
+  _dateCommande = DateTime.now();
+  _etat = 1;
+  _categorieId = null;
 
-  @override
-  void initState() {
-    super.initState();
-    _dateCommande = DateTime.now();
-    _etat = 1;
-    _categorieId = null;
+  _prixController = TextEditingController();
 
-    if (widget.commande != null) {
-      _fournisseurId = widget.commande!.fournisseurId;
-      _produitId = widget.commande!.produitId;
-      _quantiteCommandee = widget.commande!.quantiteCommandee;
-      _quantiteRecue = widget.commande!.quantiteRecue;
-      _prixUnitaire = widget.commande!.prixUnitaire;
-      _dateCommande = widget.commande!.dateCommande;
-      _etat = widget.commande!.etat;
-      
-      if (_produitId.isNotEmpty) {
-        _findCategorieFromProduit();
-      }
-    } else {
-      _fournisseurId = '';
-      _produitId = '';
-      _quantiteCommandee = 0;
-      _quantiteRecue = null;
-      _prixUnitaire = null;
+  if (widget.commande != null) {
+    _fournisseurId = widget.commande!.fournisseurId;
+    _produitId = widget.commande!.produitId;
+    _quantiteCommandee = widget.commande!.quantiteCommandee;
+    _quantiteRecue = widget.commande!.quantiteRecue;
+    _prixUnitaire = widget.commande!.prixUnitaire;
+    _dateCommande = widget.commande!.dateCommande;
+    _etat = widget.commande!.etat;
+
+    _prixController.text = _prixUnitaire?.toString() ?? '';
+
+    if (_produitId.isNotEmpty) {
+      _findCategorieFromProduit();
     }
+  } else {
+    _fournisseurId = '';
+    _produitId = '';
+    _quantiteCommandee = 0;
+    _quantiteRecue = null;
+    _prixUnitaire = null;
+    _prixController.text = '';
+  }
+}
+
+
+  double get _montantTotal {
+    final quantite = (_etat == 2 || _etat == 3)
+        ? (_quantiteRecue ?? _quantiteCommandee)
+        : _quantiteCommandee;
+    return (_prixUnitaire ?? 0) * quantite;
   }
 
   void _findCategorieFromProduit() {
@@ -84,15 +100,15 @@ class _CommandeDialogState extends ConsumerState<CommandeDialog> {
         final produit = produits.firstWhere(
           (p) => p.id == _produitId,
           orElse: () => Produit(
-            id: '', 
-            nom: '', 
-            stock: 0, 
-            prixVente: 0, 
+            id: '',
+            nom: '',
+            stock: 0,
+            prixVente: 0,
             prixAchat: 0,
-            defectueux: 0, 
-            entrepriseId: '', 
+            defectueux: 0,
+            entrepriseId: '',
             createdAt: DateTime.now(),
-            categorieId: null
+            categorieId: null,
           ),
         );
         if (produit.categorieId != null) {
@@ -110,11 +126,16 @@ class _CommandeDialogState extends ConsumerState<CommandeDialog> {
     setState(() {
       _categorieId = categorieId;
       if (categorieId == null) {
-        _produitsFiltres = _produits;
+        _produitsFiltres = [];
       } else {
-        _produitsFiltres = _produits.where((produit) => produit.categorieId == categorieId).toList();
+        _produitsFiltres = _produits
+            .where((produit) => produit.categorieId == categorieId)
+            .toList();
       }
-      if (_produitId.isNotEmpty && !_produitsFiltres.any((p) => p.id == _produitId)) {
+
+      // si le produit sélectionné n’appartient pas à cette catégorie → reset
+      if (_produitId.isNotEmpty &&
+          !_produitsFiltres.any((p) => p.id == _produitId)) {
         _produitId = '';
       }
     });
@@ -128,13 +149,47 @@ class _CommandeDialogState extends ConsumerState<CommandeDialog> {
     final categoriesState = ref.watch(categorieProduitControllerProvider);
 
     return AlertDialog(
-      title: Text(widget.commande == null ? 'Nouvelle Commande' : 'Modifier Commande'),
+      title: Text(
+        widget.commande == null ? 'Nouvelle commande' : 'Modification',
+      ),
       content: SingleChildScrollView(
         child: Form(
           key: _formKey,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              Card(
+                color: background_theme,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(10),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        "Total : ",
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: color_white,
+                        ),
+                      ),
+                      Text(
+                        "$_montantTotal $devise",
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: color_white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
               etatsState.when(
                 loading: () => const CircularProgressIndicator(),
                 error: (error, stack) => Text('Erreur: $error'),
@@ -171,7 +226,11 @@ class _CommandeDialogState extends ConsumerState<CommandeDialog> {
                   ),
                   keyboardType: TextInputType.number,
                   validator: (value) {
-                    if ((_etat == 2 || _etat == 3) && (value == null || value.isEmpty || int.tryParse(value) == null || int.parse(value) <= 0)) {
+                    if ((_etat == 2 || _etat == 3) &&
+                        (value == null ||
+                            value.isEmpty ||
+                            int.tryParse(value) == null ||
+                            int.parse(value) <= 0)) {
                       return 'Veuillez entrer la quantité reçue';
                     }
                     return null;
@@ -193,7 +252,12 @@ class _CommandeDialogState extends ConsumerState<CommandeDialog> {
                     items: _fournisseurs,
                     selectedItem: _fournisseurs.firstWhere(
                       (f) => f.id == _fournisseurId,
-                      orElse: () => Fournisseur(id: '', nom: '', entrepriseId: '', createdAt: DateTime.now()),
+                      orElse: () => Fournisseur(
+                        id: '',
+                        nom: '',
+                        entrepriseId: '',
+                        createdAt: DateTime.now(),
+                      ),
                     ),
                     itemAsString: (Fournisseur f) => f.nom,
                     popupProps: const PopupProps.menu(
@@ -233,10 +297,10 @@ class _CommandeDialogState extends ConsumerState<CommandeDialog> {
                     selectedItem: _categories.firstWhere(
                       (c) => c.id == _categorieId,
                       orElse: () => CategorieProduit(
-                        id: null, 
-                        libelle: '', 
-                        entrepriseId: '', 
-                        createdAt: DateTime.now()
+                        id: null,
+                        libelle: '',
+                        entrepriseId: '',
+                        createdAt: DateTime.now(),
                       ),
                     ),
                     itemAsString: (CategorieProduit c) => c.libelle,
@@ -273,24 +337,29 @@ class _CommandeDialogState extends ConsumerState<CommandeDialog> {
                 error: (error, stack) => Text('Erreur: $error'),
                 data: (produits) {
                   _produits = produits;
-                  if (_produitsFiltres.isEmpty) {
-                    _produitsFiltres = produits;
+                  // si aucune catégorie sélectionnée → pas de produits affichés
+                  if (_categorieId == null) {
+                    _produitsFiltres = [];
+                  } else {
+                    _produitsFiltres = produits
+                        .where((p) => p.categorieId == _categorieId)
+                        .toList();
                   }
-                  
+
                   return DropdownSearch<Produit>(
                     items: _produitsFiltres,
                     selectedItem: _produitsFiltres.firstWhere(
                       (p) => p.id == _produitId,
                       orElse: () => Produit(
-                        id: '', 
-                        nom: '', 
-                        stock: 0, 
+                        id: '',
+                        nom: '',
+                        stock: 0,
                         prixVente: 0,
-                        prixAchat: 0, 
-                        defectueux: 0, 
-                        entrepriseId: '', 
+                        prixAchat: 0,
+                        defectueux: 0,
+                        entrepriseId: '',
                         createdAt: DateTime.now(),
-                        categorieId: null
+                        categorieId: null,
                       ),
                     ),
                     itemAsString: (Produit p) => p.nom,
@@ -299,13 +368,19 @@ class _CommandeDialogState extends ConsumerState<CommandeDialog> {
                       searchDelay: Duration(milliseconds: 300),
                     ),
                     onChanged: (Produit? value) {
-                      setState(() {
-                        _produitId = value?.id ?? '';
-                        if (value != null) {
-                          _categorieId = value.categorieId;
-                        }
-                      });
-                    },
+  setState(() {
+    _produitId = value?.id ?? '';
+    if (value != null) {
+      _categorieId = value.categorieId;
+      _prixUnitaire = value.prixAchat.toDouble();
+      _prixController.text = _prixUnitaire.toString(); // met le prixAchat par défaut
+    } else {
+      _prixController.text = '';
+      _prixUnitaire = null;
+    }
+  });
+},
+
                     validator: (Produit? value) {
                       if (value == null) {
                         return 'Veuillez sélectionner un produit';
@@ -332,29 +407,37 @@ class _CommandeDialogState extends ConsumerState<CommandeDialog> {
                 ),
                 keyboardType: TextInputType.number,
                 validator: (value) {
-                  if (value == null || value.isEmpty || int.tryParse(value) == null || int.parse(value) <= 0) {
+                  if (value == null ||
+                      value.isEmpty ||
+                      int.tryParse(value) == null ||
+                      int.parse(value) <= 0) {
                     return 'Veuillez entrer une quantité valide';
                   }
                   return null;
                 },
                 onChanged: (value) {
-                  _quantiteCommandee = int.tryParse(value) ?? 0;
+                  setState(() {
+                    _quantiteCommandee = int.tryParse(value) ?? 0;
+                  });
                 },
               ),
 
               const SizedBox(height: 16),
 
-              TextFormField(
-                initialValue: _prixUnitaire?.toString(),
-                decoration: const InputDecoration(
-                  labelText: 'Prix unitaire (Optionnel)',
-                  border: OutlineInputBorder(),
-                ),
-                keyboardType: TextInputType.number,
-                onChanged: (value) {
-                  _prixUnitaire = double.tryParse(value);
-                },
-              ),
+           TextFormField(
+  controller: _prixController,
+  decoration: const InputDecoration(
+    labelText: 'Prix unitaire (Optionnel)',
+    border: OutlineInputBorder(),
+  ),
+  keyboardType: TextInputType.number,
+  onChanged: (value) {
+    setState(() {
+      _prixUnitaire = double.tryParse(value); // reste modifiable
+    });
+  },
+),
+
 
               const SizedBox(height: 16),
 
@@ -430,15 +513,15 @@ class _CommandeDialogState extends ConsumerState<CommandeDialog> {
 
       try {
         if (widget.commande == null) {
-          await commandeController.addCommande(commande);
+          await commandeController.addCommande(commande, widget.userId);
+          Message.success(context, MessageText.ajoutCommandeSuccess);
         } else {
           await commandeController.updateCommande(commande, widget.userId);
+          Message.success(context, MessageText.modificationCommandeSuccess);
         }
         Navigator.of(context).pop();
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur: $e')),
-        );
+        Message.error(context, "${MessageText.erreurGenerale} $e");
       }
     }
   }
@@ -448,7 +531,9 @@ class _CommandeDialogState extends ConsumerState<CommandeDialog> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Confirmer la suppression'),
-        content: const Text('Êtes-vous sûr de vouloir supprimer cette commande ?'),
+        content: const Text(
+          'Êtes-vous sûr de vouloir supprimer cette commande ?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -470,11 +555,10 @@ class _CommandeDialogState extends ConsumerState<CommandeDialog> {
       final commandeController = ref.read(commandeControllerProvider.notifier);
       try {
         await commandeController.deleteCommande(widget.commande!.id);
+        Message.success(context, MessageText.suppressionCommandeSuccess);
         Navigator.of(context).pop();
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur lors de la suppression: $e')),
-        );
+        Message.error(context, "${MessageText.erreurGenerale} $e");
       }
     }
   }

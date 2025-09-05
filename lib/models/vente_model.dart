@@ -1,4 +1,3 @@
-// models/vente_model.dart
 class Vente {
   final String id;
   final String produitId;
@@ -38,22 +37,22 @@ class Vente {
 
   factory Vente.fromMap(Map<String, dynamic> map) {
     return Vente(
-      id: map['id'],
-      produitId: map['produit_id'],
-      quantite: map['quantite'] as int? ?? 0, // Correction ici
-      produitRevenu: map['produit_revenu'] as int? ?? 0, // Correction ici
-      description: map['description'],
-      prixTotal: (map['prix_total'] as num?)?.toDouble() ?? 0.0, // Correction ici
-      prixUnitaire: (map['prix_unitaire'] as num?)?.toDouble() ?? 0.0, // Correction ici
-      etat: map['etat'] as int? ?? 1, // Correction ici
-      benefice: (map['benefice'] as num?)?.toDouble() ?? 0.0, // Correction ici
-      montantPaye: (map['montant_paye'] as num?)?.toDouble() ?? 0.0, // Correction ici
-      dateVente: DateTime.parse(map['date_vente'] as String? ?? DateTime.now().toIso8601String()), // Correction ici
-      clientId: map['client_id'],
-      userId: map['user_id'],
-      entrepriseId: map['entreprise_id'],
-      createdAt: DateTime.parse(map['created_at'] as String? ?? DateTime.now().toIso8601String()), // Correction ici
-      updatedAt: map['updated_at'] != null ? DateTime.parse(map['updated_at'] as String) : null, // Correction ici
+      id: map['id'] as String? ?? '',
+      produitId: map['produit_id'] as String? ?? '',
+      quantite: map['quantite'] as int? ?? 0,
+      produitRevenu: map['produit_revenu'] as int? ?? 0,
+      description: map['description'] as String?,
+      prixTotal: (map['prix_total'] as num?)?.toDouble() ?? 0.0,
+      prixUnitaire: (map['prix_unitaire'] as num?)?.toDouble() ?? 0.0,
+      etat: map['etat'] as int? ?? 1,
+      benefice: (map['benefice'] as num?)?.toDouble() ?? 0.0,
+      montantPaye: (map['montant_paye'] as num?)?.toDouble() ?? 0.0,
+      dateVente: DateTime.parse(map['date_vente'] as String? ?? DateTime.now().toIso8601String()),
+      clientId: map['client_id'] as String?,
+      userId: map['user_id'] as String? ?? '',
+      entrepriseId: map['entreprise_id'] as String? ?? '',
+      createdAt: DateTime.parse(map['created_at'] as String? ?? DateTime.now().toIso8601String()),
+      updatedAt: map['updated_at'] != null ? DateTime.parse(map['updated_at'] as String) : null,
     );
   }
 

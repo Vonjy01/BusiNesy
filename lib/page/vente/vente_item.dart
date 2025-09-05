@@ -1,4 +1,3 @@
-// models/vente_item_model.dart
 class VenteItem {
   final String id;
   final String produitId;
@@ -6,42 +5,47 @@ class VenteItem {
   final int quantite;
   final int produitRevenu;
   final double prixUnitaire;
-  final double benefice;
+  final double beneficeUnitaire;
   final double prixTotal;
   final double beneficeTotal;
+  final int etat; // Ajout du champ etat
 
   VenteItem({
     required this.id,
     required this.produitId,
     required this.produitNom,
     required this.quantite,
-    this.produitRevenu = 0,
+    required this.produitRevenu,
     required this.prixUnitaire,
-    required this.benefice,
+    required this.beneficeUnitaire,
     required this.prixTotal,
     required this.beneficeTotal,
+    required this.etat, // Ajout du champ etat
   });
 
   VenteItem copyWith({
+    String? id,
     String? produitId,
     String? produitNom,
     int? quantite,
     int? produitRevenu,
     double? prixUnitaire,
-    double? benefice,
+    double? beneficeUnitaire,
     double? prixTotal,
     double? beneficeTotal,
+    int? etat, // Ajout du champ etat
   }) {
     return VenteItem(
-      id: id,
+      id: id ?? this.id,
       produitId: produitId ?? this.produitId,
       produitNom: produitNom ?? this.produitNom,
       quantite: quantite ?? this.quantite,
       produitRevenu: produitRevenu ?? this.produitRevenu,
       prixUnitaire: prixUnitaire ?? this.prixUnitaire,
-      benefice: benefice ?? this.benefice,
+      beneficeUnitaire: beneficeUnitaire ?? this.beneficeUnitaire,
       prixTotal: prixTotal ?? this.prixTotal,
       beneficeTotal: beneficeTotal ?? this.beneficeTotal,
+      etat: etat ?? this.etat, // Ajout du champ etat
     );
   }
 }

@@ -3,17 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:project6/controller/auth_controller.dart';
 import 'package:project6/controller/vente_controller.dart';
 import 'package:project6/controller/client_controller.dart';
-import 'package:project6/controller/produit_controller.dart';
 import 'package:project6/controller/entreprise_controller.dart';
 import 'package:project6/models/vente_model.dart';
 import 'package:project6/models/client_model.dart';
-import 'package:project6/models/produits_model.dart';
-import 'package:project6/models/etat_commande.dart';
 import 'package:project6/page/vente/vente_details.dart';
-import 'package:project6/page/vente/vente_dialog.dart';
-import 'package:project6/provider/etat_commande_provider.dart';
 import 'package:project6/widget/app_drawer.dart';
-import 'package:project6/widget/generic_tabview.dart';
+import 'package:project6/widget/Header.dart';
 import 'package:project6/utils/constant.dart';
 
 class VenteList extends ConsumerStatefulWidget {
@@ -24,31 +19,12 @@ class VenteList extends ConsumerStatefulWidget {
 }
 
 class _VenteListState extends ConsumerState<VenteList> {
-  final Map<String, List<Vente>> _groupedVentes = {};
-
-  Map<String, List<Vente>> _groupVentesByClientAndDate(List<Vente> ventes) {
-    final Map<String, List<Vente>> grouped = {};
-    
-    for (final vente in ventes) {
-      final key = '${vente.clientId}-${vente.dateVente.year}-${vente.dateVente.month}-${vente.dateVente.day}';
-      if (!grouped.containsKey(key)) {
-        grouped[key] = [];
-      }
-      grouped[key]!.add(vente);
-    }
-    
-    return grouped;
-  }
-
-  String _formatDate(DateTime date) {
-    return '${date.day}/${date.month}/${date.year}';
-  }
-
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authControllerProvider);
     final activeEntrepriseState = ref.watch(activeEntrepriseProvider);
-    final etatsCommandeState = ref.watch(etatCommandeProvider);
+    final ventesState = ref.watch(venteControllerProvider);
+    final clientsState = ref.watch(clientControllerProvider);
 
     return authState.when(
       loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
@@ -66,31 +42,37 @@ class _VenteListState extends ConsumerState<VenteList> {
               );
             }
 
-            return etatsCommandeState.when(
-              loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
-              error: (error, stack) => Scaffold(body: Center(child: Text('Erreur: $error'))),
-              data: (etats) {
-                return Scaffold(
-                  drawer: AppDrawer(user: user),
-                  body: Column(
-                    children: [
-                      Expanded(
-                        child: GenericTabView(
-                          headerTitle: 'Liste des ventes',
-                          tabTitles: _buildTabTitles(etats),
-                          tabViews: _buildTabViews(etats, user.id, activeEntreprise.id, ref),
-                          tabBarOffsetY: -40,
-                        ),
+            return Scaffold(
+              drawer: AppDrawer(user: user),
+              body: Column(
+                children: [
+                  Header(
+                    title: 'Liste des ventes',
+                    showDrawerIcon: true,
+                    actions: [
+                      IconButton(
+                        icon: const Icon(Icons.add, color: Colors.white),
+                        onPressed: () => _createNewVente(context, user.id, activeEntreprise.id, ref),
                       ),
                     ],
                   ),
-                  floatingActionButton: FloatingActionButton(
-                    onPressed: () => _showAddDialog(context, user.id, activeEntreprise.id, ref),
-                    backgroundColor: background_theme,
-                    child: Icon(Icons.add, color: color_white),
+                  Expanded(
+                    child: ventesState.when(
+                      loading: () => const Center(child: CircularProgressIndicator()),
+                      error: (error, stack) => Center(child: Text('Erreur: $error')),
+                      data: (ventes) {
+                        return clientsState.when(
+                          loading: () => const Center(child: CircularProgressIndicator()),
+                          error: (error, stack) => Center(child: Text('Erreur: $error')),
+                          data: (clients) {
+                            return _buildVenteList(ventes, clients, user.id, activeEntreprise.id, ref);
+                          },
+                        );
+                      },
+                    ),
                   ),
-                );
-              },
+                ],
+              ),
             );
           },
         );
@@ -98,94 +80,8 @@ class _VenteListState extends ConsumerState<VenteList> {
     );
   }
 
-  List<String> _buildTabTitles(List<EtatCommande> etats) {
-    return ['Toutes', ...etats.map((e) => e.libelle).toList()];
-  }
-
-  List<Widget> _buildTabViews(List<EtatCommande> etats, String userId, String entrepriseId, WidgetRef ref) {
-    final allTab = _buildAllVentesTab(userId, entrepriseId, ref);
-    final etatTabs = etats.map((etat) => 
-      _buildFilteredVentesTab(userId, entrepriseId, etat.id, ref)
-    ).toList();
-    
-    return [allTab, ...etatTabs];
-  }
-
-  Widget _buildAllVentesTab(String userId, String entrepriseId, WidgetRef ref) {
-    return Consumer(
-      builder: (context, ref, child) {
-        final ventesState = ref.watch(venteControllerProvider);
-        final clientsState = ref.watch(clientControllerProvider);
-        final produitsState = ref.watch(produitControllerProvider);
-
-        return ventesState.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (error, stack) => Center(child: Text('Erreur: $error')),
-          data: (ventes) {
-            _groupedVentes.clear();
-            _groupedVentes.addAll(_groupVentesByClientAndDate(ventes));
-            
-            return clientsState.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (error, stack) => Center(child: Text('Erreur: $error')),
-              data: (clients) {
-                return produitsState.when(
-                  loading: () => const Center(child: CircularProgressIndicator()),
-                  error: (error, stack) => Center(child: Text('Erreur: $error')),
-                  data: (produits) {
-                    return _buildGroupedVenteList(_groupedVentes, clients, produits, userId, entrepriseId, ref);
-                  },
-                );
-              },
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildFilteredVentesTab(String userId, String entrepriseId, int etatId, WidgetRef ref) {
-    return Consumer(
-      builder: (context, ref, child) {
-        final ventesState = ref.watch(venteControllerProvider);
-        final clientsState = ref.watch(clientControllerProvider);
-        final produitsState = ref.watch(produitControllerProvider);
-
-        return ventesState.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (error, stack) => Center(child: Text('Erreur: $error')),
-          data: (ventes) {
-            final filteredVentes = ventes.where((v) => v.etat == etatId).toList();
-            final groupedFilteredVentes = _groupVentesByClientAndDate(filteredVentes);
-            
-            return clientsState.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (error, stack) => Center(child: Text('Erreur: $error')),
-              data: (clients) {
-                return produitsState.when(
-                  loading: () => const Center(child: CircularProgressIndicator()),
-                  error: (error, stack) => Center(child: Text('Erreur: $error')),
-                  data: (produits) {
-                    return _buildGroupedVenteList(groupedFilteredVentes, clients, produits, userId, entrepriseId, ref);
-                  },
-                );
-              },
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildGroupedVenteList(
-    Map<String, List<Vente>> groupedVentes,
-    List<Client> clients,
-    List<Produit> produits,
-    String userId,
-    String entrepriseId,
-    WidgetRef ref,
-  ) {
-    if (groupedVentes.isEmpty) {
+  Widget _buildVenteList(List<Vente> ventes, List<Client> clients, String userId, String entrepriseId, WidgetRef ref) {
+    if (ventes.isEmpty) {
       return const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -198,41 +94,40 @@ class _VenteListState extends ConsumerState<VenteList> {
       );
     }
 
+    // Grouper les ventes par client
+    final Map<String, List<Vente>> ventesParClient = {};
+    for (final vente in ventes) {
+      if (vente.clientId != null) {
+        if (!ventesParClient.containsKey(vente.clientId)) {
+          ventesParClient[vente.clientId!] = [];
+        }
+        ventesParClient[vente.clientId!]!.add(vente);
+      }
+    }
+
     return RefreshIndicator(
       onRefresh: () async => ref.refresh(venteControllerProvider),
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
-        itemCount: groupedVentes.length,
+        itemCount: ventesParClient.length,
         itemBuilder: (context, index) {
-          final key = groupedVentes.keys.elementAt(index);
-          final ventes = groupedVentes[key]!;
-          final firstVente = ventes.first;
+          final clientId = ventesParClient.keys.elementAt(index);
+          final clientVentes = ventesParClient[clientId]!;
+          final client = clients.firstWhere((c) => c.id == clientId, orElse: () => Client(id: '', nom: 'Client inconnu', entrepriseId: '', createdAt: DateTime.now()));
           
-          final client = clients.firstWhere(
-            (c) => c.id == firstVente.clientId,
-            orElse: () => Client(
-              id: '',
-              nom: 'Aucun client',
-              entrepriseId: '',
-              createdAt: DateTime.now(),
-              telephone: null,
-              email: null,
-              adresse: null,
-              description: null,
-              updatedAt: null,
-            ),
-          );
-
-          final total = ventes.fold(0.0, (sum, v) => sum + v.prixTotal);
-          final produitCount = ventes.length;
-
+          // Calculer le total pour ce client
+          final total = clientVentes.fold(0.0, (sum, v) => sum + v.prixTotal);
+          
           return Card(
             margin: const EdgeInsets.only(bottom: 16),
             elevation: 2,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             child: ListTile(
               contentPadding: const EdgeInsets.all(16),
-              leading: _buildEtatIcon(firstVente.etat),
+              leading: CircleAvatar(
+                backgroundColor: background_theme,
+                child: Text(client.nom[0], style: TextStyle(color: color_white)),
+              ),
               title: Text(
                 client.nom,
                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
@@ -241,42 +136,16 @@ class _VenteListState extends ConsumerState<VenteList> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 8),
-                  Text('$produitCount produit(s)'),
+                  Text('${clientVentes.length} produit(s)'),
                   Text('Total: ${total.toStringAsFixed(2)} $devise'),
-                  Text('Date: ${_formatDate(firstVente.dateVente)}'),
-                  Text('État: ${_getEtatLibelle(firstVente.etat)}'),
+                  Text('Date: ${_formatDate(clientVentes.first.dateVente)}'),
                 ],
               ),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.edit, size: 20),
-                    onPressed: () => _showEditDialog(context, ventes, userId, entrepriseId, ref),
-                    tooltip: 'Modifier la commande',
-                  ),
-                  PopupMenuButton(
-                    itemBuilder: (context) => [
-                      const PopupMenuItem(
-                        value: 'view',
-                        child: Text('Voir détails'),
-                      ),
-                      const PopupMenuItem(
-                        value: 'delete',
-                        child: Text('Supprimer'),
-                      ),
-                    ],
-                    onSelected: (value) {
-                      if (value == 'view') {
-                        _showDetails(context, ventes, client, produits);
-                      } else if (value == 'delete') {
-                        _deleteVentes(context, ventes, ref, userId);
-                      }
-                    },
-                  ),
-                ],
+              trailing: IconButton(
+                icon: const Icon(Icons.arrow_forward),
+                onPressed: () => _showVenteDetails(context, clientVentes, client),
               ),
-              onTap: () => _showDetails(context, ventes, client, produits),
+              onTap: () => _showVenteDetails(context, clientVentes, client),
             ),
           );
         },
@@ -284,130 +153,39 @@ class _VenteListState extends ConsumerState<VenteList> {
     );
   }
 
-  String _getEtatLibelle(int etatId) {
-    switch (etatId) {
-      case 1: return 'En attente';
-      case 2: return 'Validé';
-      case 3: return 'Incomplet';
-      case 4: return 'Annulé';
-      default: return 'Inconnu';
-    }
+  String _formatDate(DateTime date) {
+    return '${date.day}/${date.month}/${date.year}';
   }
 
-  Widget _buildEtatIcon(int etatId) {
-    switch (etatId) {
-      case 1:
-        return const CircleAvatar(
-          backgroundColor: Colors.blue,
-          child: Icon(Icons.access_time, color: Colors.white),
-        );
-      case 2:
-        return const CircleAvatar(
-          backgroundColor: Colors.green,
-          child: Icon(Icons.check, color: Colors.white),
-        );
-      case 3:
-        return const CircleAvatar(
-          backgroundColor: Colors.orange,
-          child: Icon(Icons.warning, color: Colors.white),
-        );
-      case 4:
-        return const CircleAvatar(
-          backgroundColor: Colors.red,
-          child: Icon(Icons.close, color: Colors.white),
-        );
-      default:
-        return const CircleAvatar(
-          backgroundColor: Colors.grey,
-          child: Icon(Icons.help, color: Colors.white),
-        );
-    }
-  }
-
-  void _showAddDialog(BuildContext context, String userId, String entrepriseId, WidgetRef ref) {
-    showDialog(
-      context: context,
-      builder: (context) => VenteDialog(
-        userId: userId,
-        entrepriseId: entrepriseId,
-      ),
-    ).then((_) {
-      if (mounted) {
-        ref.refresh(venteControllerProvider);
-      }
-    });
-  }
-
-  void _showEditDialog(BuildContext context, List<Vente> ventes, String userId, String entrepriseId, WidgetRef ref) {
-    showDialog(
-      context: context,
-      builder: (context) => VenteDialog(
-        vente: ventes.first,
-        userId: userId,
-        entrepriseId: entrepriseId,
-      ),
-    ).then((_) {
-      if (mounted) {
-        ref.refresh(venteControllerProvider);
-      }
-    });
-  }
-
-  void _showDetails(BuildContext context, List<Vente> ventes, Client client, List<Produit> produits) {
+  void _createNewVente(BuildContext context, String userId, String entrepriseId, WidgetRef ref) {
+    // Ouvrir directement la page de détails pour créer une nouvelle vente
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => VenteGroupDetailPage(
+        builder: (context) => VenteDetailPage(
+          client: null, // Nouvelle vente
+          userId: userId,
+          entrepriseId: entrepriseId,
+        ),
+      ),
+    ).then((_) {
+      if (mounted) {
+        ref.refresh(venteControllerProvider);
+      }
+    });
+  }
+
+  void _showVenteDetails(BuildContext context, List<Vente> ventes, Client client) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => VenteDetailPage(
           ventes: ventes,
           client: client,
-          produits: produits,
+          userId: ventes.first.userId,
+          entrepriseId: ventes.first.entrepriseId,
         ),
       ),
     );
-  }
-
-  void _deleteVentes(BuildContext context, List<Vente> ventes, WidgetRef ref, String userId) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Confirmer la suppression'),
-        content: Text('Êtes-vous sûr de vouloir supprimer cette commande de ${ventes.length} produit(s) ?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Annuler'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Supprimer'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm == true && mounted) {
-      final venteController = ref.read(venteControllerProvider.notifier);
-      try {
-        for (final vente in ventes) {
-          await venteController.deleteVente(vente.id, userId);
-        }
-        if (mounted) {
-          ref.refresh(venteControllerProvider);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Commande supprimée avec succès')),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Erreur lors de la suppression: $e')),
-          );
-        }
-      }
-    }
   }
 }

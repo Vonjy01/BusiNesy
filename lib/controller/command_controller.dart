@@ -53,21 +53,62 @@ class CommandeController extends AsyncNotifier<List<Commande>> {
       rethrow;
     }
   }
+Future<void> addCommande(Commande commande, String userId) async {
+  try {
+    state = const AsyncValue.loading();
+    final db = await _dbHelper.database;
 
-  Future<void> addCommande(Commande commande) async {
-    try {
-      state = const AsyncValue.loading();
-      final db = await _dbHelper.database;
+    await db.transaction((txn) async {
+      // Insérer la commande
+      await txn.insert('commandes', commande.toMap());
 
-      await db.insert('commandes', commande.toMap());
+      // Vérifier si l'état est déjà Réçu/Incomplet et qu'une quantité est saisie
+      if ((commande.etat == 2 || commande.etat == 3) &&
+          commande.quantiteRecue != null &&
+          commande.quantiteRecue! > 0) {
+        
+        // Charger le produit
+        final produitResult = await txn.query(
+          'produits',
+          where: 'id = ?',
+          whereArgs: [commande.produitId],
+        );
+        if (produitResult.isNotEmpty) {
+          final produitActuel = Produit.fromMap(produitResult.first);
 
-      state = await AsyncValue.guard(loadCommandes);
-    } catch (e, stack) {
-      print('Error adding commande: $e\n$stack');
-      state = AsyncValue.error(e, stack);
-      rethrow;
-    }
+          // Mettre à jour le stock
+          final nouveauStock = produitActuel.stock + commande.quantiteRecue!;
+          await txn.update(
+            'produits',
+            {
+              'stock': nouveauStock,
+              'updated_at': DateTime.now().toIso8601String(),
+            },
+            where: 'id = ?',
+            whereArgs: [commande.produitId],
+          );
+
+          // Ajouter dans l’historique des stocks
+          await txn.insert('historique_stocks', {
+            'produit_id': commande.produitId,
+            'quantite': commande.quantiteRecue!,
+            'defectueux': 0,
+            'user_id': userId,
+            'entreprise_id': commande.entrepriseId,
+            'created_at': DateTime.now().toIso8601String(),
+          });
+        }
+      }
+    });
+
+    state = await AsyncValue.guard(loadCommandes);
+  } catch (e, stack) {
+    print('Error adding commande: $e\n$stack');
+    state = AsyncValue.error(e, stack);
+    rethrow;
   }
+}
+
 // commande_controller.dart
 // commande_controller.dart - Mettez à jour la méthode updateCommande
 // commande_controller.dart - Version corrigée

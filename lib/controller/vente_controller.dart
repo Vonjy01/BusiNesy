@@ -29,6 +29,24 @@ class VenteController extends AsyncNotifier<List<Vente>> {
     }
   }
 
+  
+  // Dans VenteController
+Future<Map<String, List<Vente>>> getVentesGroupedByClient() async {
+  final ventes = await loadVentes();
+  final Map<String, List<Vente>> grouped = {};
+  
+  for (final vente in ventes) {
+    if (vente.clientId != null) {
+      if (!grouped.containsKey(vente.clientId)) {
+        grouped[vente.clientId!] = [];
+      }
+      grouped[vente.clientId!]!.add(vente);
+    }
+  }
+  
+  return grouped;
+}
+
   Future<void> addVente(Vente vente, String userId) async {
     try {
       state = const AsyncValue.loading();
