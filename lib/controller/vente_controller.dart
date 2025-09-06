@@ -157,43 +157,66 @@ Future<Map<String, List<Vente>>> getVentesGrouped() async {
     }
   }
 
-  Future<void> deleteVente(String id, String userId) async {
-    try {
-      state = const AsyncValue.loading();
-      final db = await _dbHelper.database;
+ Future<void> deleteVente(String id, String userId) async {
+  try {
+    state = const AsyncValue.loading();
+    final db = await _dbHelper.database;
 
-      // Récupérer la vente avant suppression
-      final venteResult = await db.query(
-        'ventes',
-        where: 'id = ?',
-        whereArgs: [id],
-      );
+    // Vérifier que la vente existe avant de supprimer
+    final venteResult = await db.query(
+      'ventes',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
 
-      if (venteResult.isNotEmpty) {
-        final vente = Vente.fromMap(venteResult.first);
+    if (venteResult.isNotEmpty) {
+      final vente = Vente.fromMap(venteResult.first);
 
-        await db.transaction((txn) async {
-          // Supprimer la vente
-          await txn.delete(
-            'ventes',
-            where: 'id = ?',
-            whereArgs: [id],
-          );
+      await db.transaction((txn) async {
+        // Supprimer la vente
+        final result = await txn.delete(
+          'ventes',
+          where: 'id = ?',
+          whereArgs: [id],
+        );
 
-          // Restaurer le stock seulement si la vente était validée (état 2) ou incomplète (état 3)
+        if (result > 0) {
+          // Restaurer le stock seulement si la vente était validée
           if (vente.etat == 2 || vente.etat == 3) {
             await _updateStockForVente(txn, vente, userId, isAdding: false);
           }
-        });
-      }
+        }
+      });
+    }
 
-      state = await AsyncValue.guard(loadVentes);
-    } catch (e, stack) {
-      print('Error deleting vente: $e\n$stack');
-      state = AsyncValue.error(e, stack);
-      rethrow;
+    // Recharger les ventes pour mettre à jour l'état
+    state = await AsyncValue.guard(loadVentes);
+  } catch (e, stack) {
+    print('Error deleting vente: $e\n$stack');
+    state = AsyncValue.error(e, stack);
+    rethrow;
+  }
+}
+// Dans VenteController
+Future<Map<String, List<Vente>>> getVentesGroupedByClientAndDate() async {
+  final ventes = await loadVentes();
+  final Map<String, List<Vente>> grouped = {};
+  
+  for (final vente in ventes) {
+    if (vente.clientId != null) {
+      // Créer une clé unique avec clientId + date (sans l'heure)
+      final dateKey = '${vente.dateVente.year}-${vente.dateVente.month}-${vente.dateVente.day}';
+      final key = '${vente.clientId}-$dateKey';
+      
+      if (!grouped.containsKey(key)) {
+        grouped[key] = [];
+      }
+      grouped[key]!.add(vente);
     }
   }
+  
+  return grouped;
+}
 
   // Méthodes helper pour la gestion du stock
   Future<void> _updateStockForVente(Transaction txn, Vente vente, String userId, {required bool isAdding}) async {

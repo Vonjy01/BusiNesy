@@ -1,3 +1,4 @@
+
 class VenteItem {
   final String id;
   final String produitId;
@@ -8,7 +9,7 @@ class VenteItem {
   final double beneficeUnitaire;
   final double prixTotal;
   final double beneficeTotal;
-  final int etat; // Ajout du champ etat
+  final int etat;
 
   VenteItem({
     required this.id,
@@ -20,7 +21,7 @@ class VenteItem {
     required this.beneficeUnitaire,
     required this.prixTotal,
     required this.beneficeTotal,
-    required this.etat, // Ajout du champ etat
+    required this.etat,
   });
 
   VenteItem copyWith({
@@ -33,7 +34,7 @@ class VenteItem {
     double? beneficeUnitaire,
     double? prixTotal,
     double? beneficeTotal,
-    int? etat, // Ajout du champ etat
+    int? etat,
   }) {
     return VenteItem(
       id: id ?? this.id,
@@ -45,7 +46,7 @@ class VenteItem {
       beneficeUnitaire: beneficeUnitaire ?? this.beneficeUnitaire,
       prixTotal: prixTotal ?? this.prixTotal,
       beneficeTotal: beneficeTotal ?? this.beneficeTotal,
-      etat: etat ?? this.etat, // Ajout du champ etat
+      etat: etat ?? this.etat,
     );
   }
 }

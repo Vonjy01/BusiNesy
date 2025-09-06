@@ -94,28 +94,35 @@ class _VenteListState extends ConsumerState<VenteList> {
       );
     }
 
-    // Grouper les ventes par client
-    final Map<String, List<Vente>> ventesParClient = {};
-    for (final vente in ventes) {
-      if (vente.clientId != null) {
-        if (!ventesParClient.containsKey(vente.clientId)) {
-          ventesParClient[vente.clientId!] = [];
-        }
-        ventesParClient[vente.clientId!]!.add(vente);
-      }
-    }
+    // Grouper les ventes par client ET date pour créer des commandes distinctes
+    final Map<String, List<Vente>> ventesGrouped = _groupVentesByClientAndDate(ventes);
 
     return RefreshIndicator(
       onRefresh: () async => ref.refresh(venteControllerProvider),
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
-        itemCount: ventesParClient.length,
+        itemCount: ventesGrouped.length,
         itemBuilder: (context, index) {
-          final clientId = ventesParClient.keys.elementAt(index);
-          final clientVentes = ventesParClient[clientId]!;
-          final client = clients.firstWhere((c) => c.id == clientId, orElse: () => Client(id: '', nom: 'Client inconnu', entrepriseId: '', createdAt: DateTime.now()));
+          final groupKey = ventesGrouped.keys.elementAt(index);
+          final clientVentes = ventesGrouped[groupKey]!;
           
-          // Calculer le total pour ce client
+          // Extraire le clientId du groupKey (format: clientId-date)
+          final clientId = groupKey.split('-')[0];
+          final client = clients.firstWhere(
+            (c) => c.id == clientId, 
+            orElse: () => Client(
+              id: '', 
+              nom: 'Client inconnu', 
+              entrepriseId: '', 
+              createdAt: DateTime.now(),
+              telephone: '',
+              email: '',
+              adresse: '',
+              description: ''
+            )
+          );
+          
+          // Calculer le total pour cette commande
           final total = clientVentes.fold(0.0, (sum, v) => sum + v.prixTotal);
           
           return Card(
@@ -126,7 +133,10 @@ class _VenteListState extends ConsumerState<VenteList> {
               contentPadding: const EdgeInsets.all(16),
               leading: CircleAvatar(
                 backgroundColor: background_theme,
-                child: Text(client.nom[0], style: TextStyle(color: color_white)),
+                child: Text(
+                  client.nom.isNotEmpty ? client.nom[0] : '?', 
+                  style: TextStyle(color: color_white)
+                ),
               ),
               title: Text(
                 client.nom,
@@ -153,12 +163,31 @@ class _VenteListState extends ConsumerState<VenteList> {
     );
   }
 
+  // Méthode pour grouper les ventes par client ET date
+  Map<String, List<Vente>> _groupVentesByClientAndDate(List<Vente> ventes) {
+    final Map<String, List<Vente>> grouped = {};
+    
+    for (final vente in ventes) {
+      if (vente.clientId != null) {
+        // Créer une clé unique avec clientId + date (sans l'heure)
+        final dateKey = '${vente.dateVente.year}-${vente.dateVente.month}-${vente.dateVente.day}';
+        final key = '${vente.clientId}-$dateKey';
+        
+        if (!grouped.containsKey(key)) {
+          grouped[key] = [];
+        }
+        grouped[key]!.add(vente);
+      }
+    }
+    
+    return grouped;
+  }
+
   String _formatDate(DateTime date) {
     return '${date.day}/${date.month}/${date.year}';
   }
 
   void _createNewVente(BuildContext context, String userId, String entrepriseId, WidgetRef ref) {
-    // Ouvrir directement la page de détails pour créer une nouvelle vente
     Navigator.push(
       context,
       MaterialPageRoute(

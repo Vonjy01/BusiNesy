@@ -186,8 +186,8 @@ class _CommandListState extends ConsumerState<CommandList> {
 }
 }
 Widget _buildCommandeList(
-  List<Commande> commandes, 
-  List<Fournisseur> fournisseurs, 
+  List<Commande> commandes,
+  List<Fournisseur> fournisseurs,
   List<Produit> produits,
   List<EtatCommande> etats,
   String userId,
@@ -207,79 +207,99 @@ Widget _buildCommandeList(
     );
   }
 
+  // Trier par date décroissante
+  commandes.sort((a, b) => b.dateCommande.compareTo(a.dateCommande));
+
+  // Grouper par date
+  final Map<String, List<Commande>> groupedCommandes = {};
+  for (var commande in commandes) {
+    final dateKey = _formatDate(commande.dateCommande);
+    if (!groupedCommandes.containsKey(dateKey)) {
+      groupedCommandes[dateKey] = [];
+    }
+    groupedCommandes[dateKey]!.add(commande);
+  }
+
+  final dates = groupedCommandes.keys.toList(); // Liste des dates triées
+
   return RefreshIndicator(
     onRefresh: () async => ref.refresh(commandeControllerProvider),
     child: ListView.builder(
       padding: const EdgeInsets.all(16),
-      itemCount: commandes.length,
+      itemCount: groupedCommandes.length,
       itemBuilder: (context, index) {
-        final commande = commandes[index];
-        final fournisseur = fournisseurs.firstWhere(
-          (f) => f.id == commande.fournisseurId,
-          orElse: () => Fournisseur(
-            id: '',
-            nom: 'Inconnu',
-            entrepriseId: '',
-            createdAt: DateTime.now(),
-          ),
-        );
-        
-        final produit = produits.firstWhere(
-          (p) => p.id == commande.produitId,
-          orElse: () => Produit(
-            id: '',
-            nom: 'Inconnu',
-            stock: 0,
-            prixVente: 0,
-            prixAchat: 0,
-            defectueux: 0,
-            entrepriseId: '',
-            createdAt: DateTime.now(),
-            seuilAlerte: 5,
-          ),
-        );
+        final date = dates[index];
+        final commandesForDate = groupedCommandes[date]!;
 
-        final etat = etats.firstWhere(
-          (e) => e.id == commande.etat,
-          orElse: () => EtatCommande(id: 0, libelle: 'Inconnu'),
-        );
-
-        return GestureDetector(
-          onTap: () => _showEditDialog(context, commande, userId, entrepriseId, ref),
-          child: Card(
-            margin: const EdgeInsets.only(bottom: 16),
-            elevation: 2,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            child: ListTile(
-              contentPadding: const EdgeInsets.all(8),
-              leading: _buildEtatIcon(commande.etat),
-              title: Text(
-                '${produit.nom} (${commande.quantiteCommandee}) ',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-              ),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 8),
-                  Text( fournisseur.nom),
-                  if (commande.quantiteRecue != null)
-                    Text('Reçue: ${commande.quantiteRecue}'),
-                  if (commande.prixUnitaire != null)
-                  Text(' ${_formatDate(commande.dateCommande)}'),
-                ],
-              ),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.edit, color: Colors.blue),
-                    onPressed: () => _showEditDialog(context, commande, userId, entrepriseId, ref),
-                  ),
-                  
-                ],
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Affiche la date
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8.0),
+              child: Text(
+                date,
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
             ),
-          ),
+            // Liste des commandes pour cette date
+            ...commandesForDate.map((commande) {
+              final fournisseur = fournisseurs.firstWhere(
+                (f) => f.id == commande.fournisseurId,
+                orElse: () => Fournisseur(
+                  id: '',
+                  nom: 'Inconnu',
+                  entrepriseId: '',
+                  createdAt: DateTime.now(),
+                ),
+              );
+
+              final produit = produits.firstWhere(
+                (p) => p.id == commande.produitId,
+                orElse: () => Produit(
+                  id: '',
+                  nom: 'Inconnu',
+                  stock: 0,
+                  prixVente: 0,
+                  prixAchat: 0,
+                  defectueux: 0,
+                  entrepriseId: '',
+                  createdAt: DateTime.now(),
+                  seuilAlerte: 5,
+                ),
+              );
+
+              return GestureDetector(
+                onTap: () => _showEditDialog(context, commande, userId, entrepriseId, ref),
+                child: Card(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.all(8),
+                    leading: _buildEtatIcon(commande.etat),
+                    title: Text(
+                      '${produit.nom} (${commande.quantiteCommandee})',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 4),
+                        Text(fournisseur.nom),
+                        if (commande.quantiteRecue != null)
+                          Text('Reçue: ${commande.quantiteRecue}'),
+                      ],
+                    ),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.edit, color: Colors.blue),
+                      onPressed: () => _showEditDialog(context, commande, userId, entrepriseId, ref),
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ],
         );
       },
     ),
