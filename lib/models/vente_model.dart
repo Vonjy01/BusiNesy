@@ -1,4 +1,3 @@
-// models/vente_model.dart
 class Vente {
   final String id;
   final String produitId;
@@ -36,77 +35,82 @@ class Vente {
     this.updatedAt,
   });
 
-  // fromMap, toMap, copyWith...
-}
+  factory Vente.fromMap(Map<String, dynamic> map) {
+    return Vente(
+      id: map['id'] as String? ?? '',
+      produitId: map['produit_id'] as String? ?? '',
+      quantite: map['quantite'] as int? ?? 0,
+      produitRevenu: map['produit_revenu'] as int? ?? 0,
+      description: map['description'] as String?,
+      prixTotal: (map['prix_total'] as num?)?.toDouble() ?? 0.0,
+      prixUnitaire: (map['prix_unitaire'] as num?)?.toDouble() ?? 0.0,
+      etat: map['etat'] as int? ?? 1,
+      benefice: (map['benefice'] as num?)?.toDouble() ?? 0.0,
+      montantPaye: (map['montant_paye'] as num?)?.toDouble() ?? 0.0,
+      dateVente: DateTime.parse(map['date_vente'] as String? ?? DateTime.now().toIso8601String()),
+      clientId: map['client_id'] as String?,
+      userId: map['user_id'] as String? ?? '',
+      entrepriseId: map['entreprise_id'] as String? ?? '',
+      createdAt: DateTime.parse(map['created_at'] as String? ?? DateTime.now().toIso8601String()),
+      updatedAt: map['updated_at'] != null ? DateTime.parse(map['updated_at'] as String) : null,
+    );
+  }
 
-// models/vente_session.dart
-class VenteSession {
-  final String? clientId;
-  final DateTime dateVente;
-  final String? description;
-  final double montantPaye;
-  final List<VenteItem> items;
-
-  VenteSession({
-    this.clientId,
-    required this.dateVente,
-    this.description,
-    required this.montantPaye,
-    required this.items,
-  });
-
-  double get total => items.fold(0, (sum, item) => sum + item.prixTotal);
-}
-
-// models/vente_item.dart
-class VenteItem {
-  final String id;
-  final String produitId;
-  final String produitNom;
-  final int quantite;
-  final int produitRevenu;
-  final double prixUnitaire;
-  final double beneficeUnitaire;
-  final double prixTotal;
-  final double beneficeTotal;
-  final int etat;
-
-  VenteItem({
-    required this.id,
-    required this.produitId,
-    required this.produitNom,
-    required this.quantite,
-    required this.produitRevenu,
-    required this.prixUnitaire,
-    required this.beneficeUnitaire,
-    required this.prixTotal,
-    required this.beneficeTotal,
-    required this.etat,
-  });
-
-  VenteItem copyWith({
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'produit_id': produitId,
+      'quantite': quantite,
+      'produit_revenu': produitRevenu,
+      'description': description,
+      'prix_total': prixTotal,
+      'prix_unitaire': prixUnitaire,
+      'etat': etat,
+      'benefice': benefice,
+      'montant_paye': montantPaye,
+      'date_vente': dateVente.toIso8601String(),
+      'client_id': clientId,
+      'user_id': userId,
+      'entreprise_id': entrepriseId,
+      'created_at': createdAt.toIso8601String(),
+      'updated_at': updatedAt?.toIso8601String(),
+    };
+  }
+   Vente copyWith({
     String? id,
     String? produitId,
-    String? produitNom,
     int? quantite,
     int? produitRevenu,
-    double? prixUnitaire,
-    double? beneficeUnitaire,
+    String? description,
     double? prixTotal,
-    double? beneficeTotal,
+    double? prixUnitaire,
     int? etat,
+    double? benefice,
+    double? montantPaye,
+    DateTime? dateVente,
+    String? clientId,
+    String? userId,
+    String? entrepriseId,
+    DateTime? createdAt,
+    DateTime? updatedAt,
   }) {
-    return VenteItem(
+    return Vente(
       id: id ?? this.id,
       produitId: produitId ?? this.produitId,
-      produitNom: produitNom ?? this.produitNom,
       quantite: quantite ?? this.quantite,
       produitRevenu: produitRevenu ?? this.produitRevenu,
-      prixUnitaire: prixUnitaire ?? this.prixUnitaire,
-      beneficeUnitaire: beneficeUnitaire ?? this.beneficeUnitaire,
+      description: description ?? this.description,
       prixTotal: prixTotal ?? this.prixTotal,
-      beneficeTotal: beneficeTotal ?? this.beneficeTotal,
+      prixUnitaire: prixUnitaire ?? this.prixUnitaire,
       etat: etat ?? this.etat,
+      benefice: benefice ?? this.benefice,
+      montantPaye: montantPaye ?? this.montantPaye,
+      dateVente: dateVente ?? this.dateVente,
+      clientId: clientId ?? this.clientId,
+      userId: userId ?? this.userId,
+      entrepriseId: entrepriseId ?? this.entrepriseId,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 }

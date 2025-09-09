@@ -3,12 +3,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:project6/controller/auth_controller.dart';
 import 'package:project6/controller/entreprise_controller.dart';
+import 'package:project6/page/entreprise/entreprise_selection.dart';
 import 'package:project6/utils/constant.dart';
 import 'package:project6/widget/Header.dart';
 import 'package:project6/widget/app_drawer.dart';
 import 'package:project6/widget/arrivage_list.dart';
 import 'package:project6/widget/produit_vendu.dart';
 import 'package:project6/widget/stat_card.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
@@ -18,8 +21,36 @@ class HomePage extends ConsumerStatefulWidget {
 }
 
 class _HomePageState extends ConsumerState<HomePage> {
+  bool _checkingEnterprise = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkEnterpriseSelection();
+  }
+
+  Future<void> _checkEnterpriseSelection() async {
+    final prefs = await SharedPreferences.getInstance();
+    final entrepriseId = prefs.getString("entrepriseId");
+    
+    if (entrepriseId == null && mounted) {
+      // Rediriger vers la sélection d'entreprise si aucune n'est sélectionnée
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const EntrepriseSelectionPage()),
+        (route) => false,
+      );
+      return;
+    }
+    
+    setState(() => _checkingEnterprise = false);
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_checkingEnterprise) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
     final authState = ref.watch(authControllerProvider);
     final activeEntrepriseAsync = ref.watch(activeEntrepriseProvider);
 
@@ -46,9 +77,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                 title: 'Page d\'accueil',
                 content: SizedBox.expand(
                   child: Padding(
-                    padding: const EdgeInsets.only(
-                      bottom: 0,
-                    ), // Ajustez pour coller parfaitement en bas
+                    padding: const EdgeInsets.only(bottom: 0),
                     child: Align(
                       alignment: Alignment.bottomCenter,
                       child: Container(
@@ -58,12 +87,10 @@ class _HomePageState extends ConsumerState<HomePage> {
                         ),
                         decoration: BoxDecoration(
                           color: theme_light,
-                          borderRadius: BorderRadius.only(
+                          borderRadius: const BorderRadius.only(
                             topLeft: Radius.circular(8),
                             topRight: Radius.circular(8),
-                            bottomRight: Radius.circular(
-                              0,
-                            ), // Pas d'arrondi pour coller au bord
+                            bottomRight: Radius.circular(0),
                           ),
                         ),
                         child: activeEntrepriseAsync.when(

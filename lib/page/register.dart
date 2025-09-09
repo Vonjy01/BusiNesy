@@ -1,19 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:project6/controller/auth_controller.dart';
-import 'package:project6/page/entreprise/entreprise_selection.dart';
-import 'package:project6/page/register.dart';
+import 'package:project6/page/entreprise/nouveau_entreprise.dart';
 import 'package:project6/utils/constant.dart';
 
-class LoginScreen extends ConsumerStatefulWidget {
-  const LoginScreen({super.key});
+class RegisterScreen extends ConsumerStatefulWidget {
+  const RegisterScreen({super.key});
 
   @override
-  ConsumerState<LoginScreen> createState() => _LoginScreenState();
+  ConsumerState<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _LoginScreenState extends ConsumerState<LoginScreen> {
+class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _nomController = TextEditingController();
   final _telephoneController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
@@ -21,8 +21,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
+    return  Container(
         decoration: const BoxDecoration(
           gradient: headerGradient
         ),
@@ -42,21 +41,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        // Logo/Icon
+                        // Icone
                         Container(
-                          width: 100,
-                          height: 100,
+                          width: 80,
+                          height: 80,
                           decoration: BoxDecoration(
                             color: background_theme,
                             shape: BoxShape.circle,
                           ),
-                          child: Image.asset(logo_path)
+                          child: const Icon(
+                            Icons.person_add,
+                            size: 40,
+                            color: background_theme,
+                          ),
                         ),
                         const SizedBox(height: 24),
                         
                         // Titre
                         const Text(
-                          'Connexion',
+                          'Créer un compte',
                           style: TextStyle(
                             fontSize: 28,
                             fontWeight: FontWeight.bold,
@@ -65,20 +68,35 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                         const SizedBox(height: 8),
                         const Text(
-                          'Connectez-vous à votre compte',
+                          'Suivre votre business',
                           style: TextStyle(
                             fontSize: 16,
                             color: Colors.grey,
                           ),
-                          textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 32),
+
+                        // Champ nom
+                        TextFormField(
+                          controller: _nomController,
+                          decoration: InputDecoration(
+                            labelText: 'Nom complet',
+                            prefixIcon: const Icon(Icons.person),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            filled: true,
+                            fillColor: Colors.grey.shade50,
+                          ),
+                          validator: (value) => value!.isEmpty ? 'Ce champ est obligatoire' : null,
+                        ),
+                        const SizedBox(height: 20),
 
                         // Champ téléphone
                         TextFormField(
                           controller: _telephoneController,
                           decoration: InputDecoration(
-                            labelText: 'Numéro de téléphone',
+                            labelText: 'Téléphone',
                             prefixIcon: const Icon(Icons.phone),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
@@ -115,11 +133,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             fillColor: Colors.grey.shade50,
                           ),
                           obscureText: _obscurePassword,
-                          validator: (value) => value!.isEmpty ? 'Ce champ est obligatoire' : null,
+                          validator: (value) {
+                            if (value!.isEmpty) return 'Ce champ est obligatoire';
+                            if (value.length < 4) return '4 caractères minimum';
+                            return null;
+                          },
                         ),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 32),
 
-                        // Bouton de connexion
+                        // Bouton d'inscription
                         SizedBox(
                           width: double.infinity,
                           height: 56,
@@ -132,45 +154,27 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               ),
                               elevation: 4,
                             ),
-                            onPressed: _isLoading ? null : _login,
+                            onPressed: _isLoading ? null : _register,
                             child: _isLoading
                                 ? const CircularProgressIndicator(color: Colors.white)
                                 : const Text(
-                                    'Se connecter',
+                                    'S\'inscrire',
                                     style: TextStyle(fontSize: 18),
                                   ),
                           ),
                         ),
                         const SizedBox(height: 24),
-      SizedBox(
-                          width: double.infinity,
-                          height: 56,
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: background_theme,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              elevation: 4,
-                            ),
-                            onPressed: _isLoading
+
+                        // Lien vers la connexion
+                        TextButton(
+                          onPressed: _isLoading
                               ? null
-                              : () => Navigator.push(
-                                    context,
-                                    MaterialPageRoute(builder: (_) => const RegisterScreen()),
-                                  ),
+                              : () => Navigator.pop(context),
                           child: const Text(
-                            'Créer un compte',
-                            style: TextStyle(
-                              color: color_white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+                            'Déjà un compte ? Se connecter',
+                            style: TextStyle(color: background_theme),
                           ),
                         ),
-                        // Lien vers l'inscription
-                       
                       ],
                     ),
                   ),
@@ -179,23 +183,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             ),
           ),
         ),
-      ),
+      
     );
   }
 
-  Future<void> _login() async {
+  Future<void> _register() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
     try {
-      await ref.read(authControllerProvider.notifier).login(
-            _telephoneController.text,
-            _passwordController.text,
+      await ref.read(authControllerProvider.notifier).register(
+            nom: _nomController.text,
+            telephone: _telephoneController.text,
+            motDePasse: _passwordController.text,
           );
-
-      if (context.mounted) {
+      
+      if (mounted) {
         Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const EntrepriseSelectionPage()),
+          MaterialPageRoute(builder: (_) =>  NouveauEntreprise()),
           (route) => false,
         );
       }
@@ -217,6 +222,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   void dispose() {
+    _nomController.dispose();
     _telephoneController.dispose();
     _passwordController.dispose();
     super.dispose();

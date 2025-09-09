@@ -4,15 +4,17 @@ import 'package:project6/controller/auth_controller.dart';
 import 'package:project6/controller/entreprise_controller.dart';
 import 'package:project6/models/user_model.dart';
 import 'package:project6/page/%20historique_stock/historique_stock.dart';
+import 'package:project6/page/auth/login_page.dart';
 import 'package:project6/page/cat_prod.dart/cat_prod_list.dart';
 import 'package:project6/page/client/client_list.dart';
 import 'package:project6/page/command/command_list.dart';
+import 'package:project6/page/entreprise/entreprise_selection.dart';
 import 'package:project6/page/fournisseur/fournisseur_list.dart';
 import 'package:project6/page/home_page.dart';
 import 'package:project6/page/produit/produit_list.dart';
 import 'package:project6/page/vente/vente_list.dart';
 import 'package:project6/utils/constant.dart';
-
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AppDrawer extends ConsumerWidget {
   final User user;
@@ -40,7 +42,7 @@ class AppDrawer extends ConsumerWidget {
                   children: [
                     const CircleAvatar(
                       radius: 40,
-                      backgroundImage: AssetImage('assets/images/logo1.jpg'),
+                      backgroundImage: AssetImage(logo_path),
                     ),
                     const SizedBox(width: 15),
                     Expanded(
@@ -59,10 +61,14 @@ class AppDrawer extends ConsumerWidget {
                               ),
                               data: (entreprise) => Row(
                                 children: [
-                                  const Icon(Icons.business, color: color_white),
+                                  const Icon(
+                                    Icons.business,
+                                    color: color_white,
+                                  ),
                                   const SizedBox(width: 10),
                                   Text(
-                                    entreprise?.nom ?? 'Aucune entreprise active',
+                                    entreprise?.nom ??
+                                        'Aucune entreprise active',
                                     style: const TextStyle(
                                       color: color_white,
                                       fontSize: 16,
@@ -151,7 +157,7 @@ class AppDrawer extends ConsumerWidget {
                     'Fournisseur',
                     const FournisseurList(),
                   ),
-                   ListDrawer(
+                  ListDrawer(
                     context,
                     const Icon(Icons.category_outlined, color: color_white),
                     'Catégorie produit',
@@ -169,6 +175,20 @@ class AppDrawer extends ConsumerWidget {
                     'Aide',
                     const HomePage(),
                   ),
+                  ListTile(
+                    leading: const Icon(Icons.business),
+                    title: const Text('Changer d\'entreprise'),
+                    onTap: () async {
+                      final prefs = await SharedPreferences.getInstance();
+                      await prefs.remove("entrepriseId");
+                      await prefs.remove("entrepriseNom");
+                      
+                      Navigator.of(context).pushAndRemoveUntil(
+                        MaterialPageRoute(builder: (_) => const EntrepriseSelectionPage()),
+                        (route) => false,
+                      );
+                    },
+                  ),
                   ListDrawer(
                     context,
                     const Icon(Icons.settings, color: color_white),
@@ -176,24 +196,31 @@ class AppDrawer extends ConsumerWidget {
                     const HomePage(),
                   ),
                   const Divider(),
-                  ListTile(
-                    leading: const CircleAvatar(
-                      backgroundColor: background_theme,
-                      radius: 20,
-                      child: Icon(Icons.logout, color: Colors.white),
-                    ),
-                    title: const Text('Déconnexion'),
-                    onTap: () {
-                      ref.read(authControllerProvider.notifier).logout();
-                      Navigator.of(context).pushAndRemoveUntil(
-                        MaterialPageRoute(builder: (_) => const HomePage()),
-                        (route) => false,
-                      );
-                    },
-                  ),
+ ListTile(
+  leading: const Icon(Icons.exit_to_app),
+  title: const Text("Déconnexion"),
+  onTap: () async {
+    await ref.read(authControllerProvider.notifier).logout();
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove("entrepriseId");
+    await prefs.remove("entrepriseNom");
+    await prefs.setBool('first_run', true);
+
+    if (context.mounted) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LoginScreen()), // Utilisez MaterialPageRoute directement
+        (route) => false,
+      );
+    }
+  }
+),
                   const Padding(
                     padding: EdgeInsets.all(16),
-                    child: Text('Version 1.0.0', style: TextStyle(color: Colors.grey)),
+                    child: Text(
+                      'Version 1.0.0',
+                      style: TextStyle(color: Colors.grey),
+                    ),
                   ),
                 ],
               ),

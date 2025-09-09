@@ -9,7 +9,7 @@ const color_success = Color.fromARGB(255, 11, 118, 15);
 const theme_light = Color.fromARGB(255, 244, 234, 255);
 const color_warning = Colors.orange;
 const devise = 'Ar';
-const logo_path = 'assets/images/logoStock.png';
+const logo_path = 'assets/images/logo_BN2.jpg';
 const bg_light = Color.fromARGB(255, 248, 203, 246);
 const LinearGradient headerGradient = LinearGradient(
   colors: <Color>[

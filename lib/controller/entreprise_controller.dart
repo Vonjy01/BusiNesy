@@ -48,6 +48,10 @@ class EntrepriseController extends AsyncNotifier<List<Entreprise>> {
 
     return entreprises.map(Entreprise.fromMap).toList();
   }
+  Future<List<Entreprise>> loadEntreprises() async {
+  return _loadEntreprises();
+}
+
 
   Future<void> createEntreprise({
     required String nom,
@@ -104,4 +108,20 @@ class EntrepriseController extends AsyncNotifier<List<Entreprise>> {
       rethrow;
     }
   }
+
+  // Dans votre entreprise_controller.dart
+Future<bool> verifyEntreprisePassword(String entrepriseId, String password) async {
+  try {
+    final db = await _dbHelper.database;
+    final entreprises = await db.query(
+      'entreprises',
+      where: 'id = ? AND mot_de_passe = ?',
+      whereArgs: [entrepriseId, password],
+    );
+    
+    return entreprises.isNotEmpty;
+  } catch (e) {
+    return false;
+  }
+}
 }

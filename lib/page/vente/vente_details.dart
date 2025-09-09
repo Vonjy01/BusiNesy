@@ -51,7 +51,7 @@ class _VenteDetailPageState extends ConsumerState<VenteDetailPage> {
   int? _currentCategorieId;
   int _currentQuantite = 1;
   int _currentProduitRevenu = 0;
-  int _currentEtat = 1;
+  int _currentEtat = 1; // État par défaut = 1 (En attente)
 
   final TextEditingController _quantiteController = TextEditingController();
   final TextEditingController _produitRevenuController = TextEditingController();
@@ -73,6 +73,9 @@ class _VenteDetailPageState extends ConsumerState<VenteDetailPage> {
       
       // Charger les produits de la vente avec leurs noms
       _loadVentesWithProductNames();
+    } else if (widget.client != null) {
+      // Si on ouvre directement avec un client (depuis la liste)
+      _selectedClient = widget.client;
     }
   }
 
@@ -253,6 +256,7 @@ class _VenteDetailPageState extends ConsumerState<VenteDetailPage> {
             ),
             const SizedBox(height: 12),
             
+            // État depuis la table etat_commande
             Consumer(
               builder: (context, ref, child) {
                 final etatsState = ref.watch(etatCommandeProvider);
@@ -440,7 +444,7 @@ class _VenteDetailPageState extends ConsumerState<VenteDetailPage> {
                       data: (produits) {
                         _produits = produits;
                         List<Produit> produitsFiltres = selectedCategorieId == null 
-                            ? produits // Montrer tous les produits si aucune catégorie n'est sélectionnée
+                            ? produits
                             : produits.where((p) => p.categorieId == selectedCategorieId).toList();
                         
                         return DropdownSearch<Produit>(
@@ -471,6 +475,7 @@ class _VenteDetailPageState extends ConsumerState<VenteDetailPage> {
                     ),
                     const SizedBox(height: 12),
 
+                    // État depuis la table etat_commande
                     etatsState.when(
                       loading: () => const CircularProgressIndicator(),
                       error: (error, stack) => Text('Erreur: $error'),
@@ -616,7 +621,13 @@ class _VenteDetailPageState extends ConsumerState<VenteDetailPage> {
 
   Future<void> _enregistrerVente() async {
     if (_formKey.currentState!.validate()) {
-      if (_selectedClient == null) {
+      // Vérifier le client selon le contexte
+      final Client? client;
+      if (widget.client != null) {
+        client = widget.client;
+      } else if (_selectedClient != null) {
+        client = _selectedClient;
+      } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Veuillez sélectionner un client')),
         );
@@ -633,6 +644,14 @@ class _VenteDetailPageState extends ConsumerState<VenteDetailPage> {
       final venteController = ref.read(venteControllerProvider.notifier);
       final List<Vente> ventes = [];
 
+      // Déterminer la date de vente
+      final DateTime dateVente;
+      if (widget.ventes != null && widget.ventes!.isNotEmpty) {
+        dateVente = widget.ventes!.first.dateVente;
+      } else {
+        dateVente = DateTime.now();
+      }
+
       for (final item in _venteItems) {
         final vente = Vente(
           id: widget.ventes != null ? item.id : _uuid.v4(),
@@ -645,8 +664,8 @@ class _VenteDetailPageState extends ConsumerState<VenteDetailPage> {
           etat: item.etat,
           benefice: item.beneficeTotal,
           montantPaye: _montantPaye / _venteItems.length,
-          dateVente: _dateVente,
-          clientId: _selectedClient!.id,
+          dateVente: dateVente,
+          clientId: client!.id,
           userId: widget.userId,
           entrepriseId: widget.entrepriseId,
           createdAt: widget.ventes != null ? DateTime.now() : DateTime.now(),
@@ -661,7 +680,6 @@ class _VenteDetailPageState extends ConsumerState<VenteDetailPage> {
             await venteController.addVente(vente, widget.userId);
           }
         } else {
-          // Supprimer les anciennes ventes et ajouter les nouvelles
           for (final vente in widget.ventes!) {
             await venteController.deleteVente(vente.id, widget.userId);
           }
@@ -703,7 +721,12 @@ class _VenteDetailPageState extends ConsumerState<VenteDetailPage> {
             content: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (_selectedClient != null)
+                if (widget.client != null)
+                  Text(
+                    'Client: ${widget.client!.nom}',
+                    style: const TextStyle(color: Colors.white, fontSize: 16),
+                  ),
+                if (_selectedClient != null && widget.client == null)
                   Text(
                     'Client: ${_selectedClient!.nom}',
                     style: const TextStyle(color: Colors.white, fontSize: 16),
@@ -733,7 +756,7 @@ class _VenteDetailPageState extends ConsumerState<VenteDetailPage> {
                 key: _formKey,
                 child: ListView(
                   children: [
-                    if (widget.ventes == null) ...[
+                    if (widget.ventes == null && widget.client == null) ...[
                       _buildInformationsGenerales(clientsState),
                       const SizedBox(height: 20),
                     ],
@@ -843,7 +866,22 @@ class _VenteDetailPageState extends ConsumerState<VenteDetailPage> {
                 Text('Bénéfice unitaire: ${item.beneficeUnitaire.toStringAsFixed(2)} $devise'),
                 Text('Total: ${item.prixTotal.toStringAsFixed(2)} $devise'),
                 Text('Bénéfice total: ${item.beneficeTotal.toStringAsFixed(2)} $devise'),
-                Text('État: ${_getEtatLibelle(item.etat)}'),
+                Consumer(
+                  builder: (context, ref, child) {
+                    final etatsState = ref.watch(etatCommandeProvider);
+                    return etatsState.when(
+                      loading: () => const Text('État: Chargement...'),
+                      error: (error, stack) => Text('État: Erreur'),
+                      data: (etats) {
+                        final etat = etats.firstWhere(
+                          (e) => e.id == item.etat,
+                          orElse: () => EtatCommande(id: 0, libelle: 'Inconnu'),
+                        );
+                        return Text('État: ${etat.libelle}');
+                      },
+                    );
+                  },
+                ),
               ],
             ),
             trailing: PopupMenuButton<String>(
@@ -869,16 +907,6 @@ class _VenteDetailPageState extends ConsumerState<VenteDetailPage> {
         )).toList(),
       ],
     );
-  }
-
-  String _getEtatLibelle(int etatId) {
-    switch (etatId) {
-      case 1: return 'En attente';
-      case 2: return 'Validé';
-      case 3: return 'Incomplet';
-      case 4: return 'Annulé';
-      default: return 'Inconnu';
-    }
   }
 
   Widget _buildSectionTotaux() {

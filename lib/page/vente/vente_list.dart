@@ -65,7 +65,7 @@ class _VenteListState extends ConsumerState<VenteList> {
                           loading: () => const Center(child: CircularProgressIndicator()),
                           error: (error, stack) => Center(child: Text('Erreur: $error')),
                           data: (clients) {
-                            return _buildVenteList(ventes, clients, user.id, activeEntreprise.id, ref);
+                            return _buildVenteList(ventes, clients, ref);
                           },
                         );
                       },
@@ -80,7 +80,7 @@ class _VenteListState extends ConsumerState<VenteList> {
     );
   }
 
-  Widget _buildVenteList(List<Vente> ventes, List<Client> clients, String userId, String entrepriseId, WidgetRef ref) {
+  Widget _buildVenteList(List<Vente> ventes, List<Client> clients, WidgetRef ref) {
     if (ventes.isEmpty) {
       return const Center(
         child: Column(
@@ -94,35 +94,28 @@ class _VenteListState extends ConsumerState<VenteList> {
       );
     }
 
-    // Grouper les ventes par client ET date pour créer des commandes distinctes
-    final Map<String, List<Vente>> ventesGrouped = _groupVentesByClientAndDate(ventes);
+    // Grouper les ventes par client
+    final Map<String, List<Vente>> ventesParClient = {};
+    for (final vente in ventes) {
+      if (vente.clientId != null) {
+        if (!ventesParClient.containsKey(vente.clientId)) {
+          ventesParClient[vente.clientId!] = [];
+        }
+        ventesParClient[vente.clientId!]!.add(vente);
+      }
+    }
 
     return RefreshIndicator(
       onRefresh: () async => ref.refresh(venteControllerProvider),
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
-        itemCount: ventesGrouped.length,
+        itemCount: ventesParClient.length,
         itemBuilder: (context, index) {
-          final groupKey = ventesGrouped.keys.elementAt(index);
-          final clientVentes = ventesGrouped[groupKey]!;
+          final clientId = ventesParClient.keys.elementAt(index);
+          final clientVentes = ventesParClient[clientId]!;
+          final client = clients.firstWhere((c) => c.id == clientId);
           
-          // Extraire le clientId du groupKey (format: clientId-date)
-          final clientId = groupKey.split('-')[0];
-          final client = clients.firstWhere(
-            (c) => c.id == clientId, 
-            orElse: () => Client(
-              id: '', 
-              nom: 'Client inconnu', 
-              entrepriseId: '', 
-              createdAt: DateTime.now(),
-              telephone: '',
-              email: '',
-              adresse: '',
-              description: ''
-            )
-          );
-          
-          // Calculer le total pour cette commande
+          // Calculer le total pour ce client
           final total = clientVentes.fold(0.0, (sum, v) => sum + v.prixTotal);
           
           return Card(
@@ -134,7 +127,7 @@ class _VenteListState extends ConsumerState<VenteList> {
               leading: CircleAvatar(
                 backgroundColor: background_theme,
                 child: Text(
-                  client.nom.isNotEmpty ? client.nom[0] : '?', 
+                  client.nom[0], 
                   style: TextStyle(color: color_white)
                 ),
               ),
@@ -146,16 +139,15 @@ class _VenteListState extends ConsumerState<VenteList> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 8),
-                  Text('${clientVentes.length} produit(s)'),
+                  Text('${clientVentes.length} vente(s)'),
                   Text('Total: ${total.toStringAsFixed(2)} $devise'),
-                  Text('Date: ${_formatDate(clientVentes.first.dateVente)}'),
                 ],
               ),
               trailing: IconButton(
                 icon: const Icon(Icons.arrow_forward),
-                onPressed: () => _showVenteDetails(context, clientVentes, client),
+                onPressed: () => _showClientDetails(context, clientVentes, client),
               ),
-              onTap: () => _showVenteDetails(context, clientVentes, client),
+              onTap: () => _showClientDetails(context, clientVentes, client),
             ),
           );
         },
@@ -163,36 +155,14 @@ class _VenteListState extends ConsumerState<VenteList> {
     );
   }
 
-  // Méthode pour grouper les ventes par client ET date
-  Map<String, List<Vente>> _groupVentesByClientAndDate(List<Vente> ventes) {
-    final Map<String, List<Vente>> grouped = {};
-    
-    for (final vente in ventes) {
-      if (vente.clientId != null) {
-        // Créer une clé unique avec clientId + date (sans l'heure)
-        final dateKey = '${vente.dateVente.year}-${vente.dateVente.month}-${vente.dateVente.day}';
-        final key = '${vente.clientId}-$dateKey';
-        
-        if (!grouped.containsKey(key)) {
-          grouped[key] = [];
-        }
-        grouped[key]!.add(vente);
-      }
-    }
-    
-    return grouped;
-  }
-
-  String _formatDate(DateTime date) {
-    return '${date.day}/${date.month}/${date.year}';
-  }
-
   void _createNewVente(BuildContext context, String userId, String entrepriseId, WidgetRef ref) {
+    // Ouvrir la page de détail SANS client (nouvelle vente)
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => VenteDetailPage(
-          client: null, // Nouvelle vente
+          ventes: null, // Nouvelle vente
+          client: null, // Pas de client spécifique
           userId: userId,
           entrepriseId: entrepriseId,
         ),
@@ -204,13 +174,14 @@ class _VenteListState extends ConsumerState<VenteList> {
     });
   }
 
-  void _showVenteDetails(BuildContext context, List<Vente> ventes, Client client) {
+  void _showClientDetails(BuildContext context, List<Vente> ventes, Client client) {
+    // Ouvrir la page de détail AVEC le client (pour ajouter à ses ventes existantes)
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => VenteDetailPage(
-          ventes: ventes,
-          client: client,
+          ventes: ventes, // Ventes existantes de ce client
+          client: client, // Client spécifique
           userId: ventes.first.userId,
           entrepriseId: ventes.first.entrepriseId,
         ),

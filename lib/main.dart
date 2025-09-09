@@ -1,11 +1,11 @@
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:project6/controller/auth_controller.dart';
 import 'package:project6/controller/entreprise_controller.dart';
 import 'package:project6/page/auth/login_page.dart';
-import 'package:project6/page/home_page.dart';
-import 'package:project6/page/nouveau_entreprise.dart';
+import 'package:project6/page/entreprise/entreprise_selection.dart';
 import 'package:project6/services/database_helper.dart';
 
 void main() async {
@@ -37,6 +37,11 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
       ),
       home: const AuthWrapper(),
+      // Ajoutez cette configuration pour les routes nommées
+      routes: {
+        '/login': (context) => const LoginScreen(),
+        '/entreprise-selection': (context) => const EntrepriseSelectionPage(),
+      },
     );
   }
 }
@@ -47,7 +52,6 @@ class AuthWrapper extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authControllerProvider);
-    final entreprisesState = ref.watch(entrepriseControllerProvider);
 
     return authState.when(
       loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
@@ -55,15 +59,8 @@ class AuthWrapper extends ConsumerWidget {
       data: (user) {
         if (user == null) return const LoginScreen();
         
-        return entreprisesState.when(
-          loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
-          error: (error, stack) =>  NouveauEntreprise(),
-          data: (entreprises) {
-            // Vérifier si l'utilisateur a au moins une entreprise
-            final userEntreprises = entreprises.where((e) => e.userId == user.id).toList();
-            return userEntreprises.isNotEmpty ? const HomePage() :  NouveauEntreprise();
-          },
-        );
+        // TOUJOURS rediriger vers la sélection d'entreprise après connexion
+        return const EntrepriseSelectionPage();
       },
     );
   }

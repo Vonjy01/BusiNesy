@@ -111,8 +111,8 @@ class AuthController extends _$AuthController {
       rethrow;
     }
   }
-  Future<void> logout() async {
-    await _secureStorage.deleteAll();
-    state = const AsyncData(null);
-  }
+ Future<void> logout() async {
+  await _secureStorage.delete(key: 'user_id');
+  state = const AsyncData(null);
+}
 }
