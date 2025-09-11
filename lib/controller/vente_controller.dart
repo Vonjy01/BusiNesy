@@ -8,20 +8,36 @@ import 'package:uuid/uuid.dart';
 final venteControllerProvider = AsyncNotifierProvider<VenteController, List<Vente>>(
   VenteController.new,
 );
-
 class VenteController extends AsyncNotifier<List<Vente>> {
   final DatabaseHelper _dbHelper = DatabaseHelper.instance;
   final Uuid _uuid = const Uuid();
+  String? _currentEntrepriseId; // ← AJOUTEZ cette ligne
 
   @override
   Future<List<Vente>> build() async {
-    return await loadVentes();
+    return []; // ← Liste vide au début
   }
 
-  Future<List<Vente>> loadVentes() async {
+  // AJOUTEZ cette méthode (comme dans ClientController)
+    Future<void> loadVentes(String entrepriseId) async {
+    if (_currentEntrepriseId == entrepriseId && state is! AsyncError) {
+      return;
+    }
+    
+    _currentEntrepriseId = entrepriseId;
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() => _loadVentes(entrepriseId: entrepriseId));
+  }
+
+  Future<List<Vente>> _loadVentes({required String entrepriseId}) async {
     try {
       final db = await _dbHelper.database;
-      final ventes = await db.query('ventes', orderBy: 'date_vente DESC');
+      final ventes = await db.query(
+        'ventes',
+        where: 'entreprise_id = ?', // ← Filtre par entreprise
+        whereArgs: [entrepriseId],
+        orderBy: 'date_vente DESC'
+      );
       return ventes.map(Vente.fromMap).toList();
     } catch (e, stack) {
       print('Error loading ventes: $e\n$stack');
@@ -29,40 +45,24 @@ class VenteController extends AsyncNotifier<List<Vente>> {
     }
   }
 
-  
-  // Dans VenteController
-Future<Map<String, List<Vente>>> getVentesGroupedByClient() async {
-  final ventes = await loadVentes();
-  final Map<String, List<Vente>> grouped = {};
-  
-  for (final vente in ventes) {
-    if (vente.clientId != null) {
-      if (!grouped.containsKey(vente.clientId)) {
-        grouped[vente.clientId!] = [];
-      }
-      grouped[vente.clientId!]!.add(vente);
-    }
-  }
-  
-  return grouped;
-}
 
+  // MODIFIEZ addVente pour utiliser _loadVentes
   Future<void> addVente(Vente vente, String userId) async {
     try {
       state = const AsyncValue.loading();
       final db = await _dbHelper.database;
 
       await db.transaction((txn) async {
-        // Insérer la vente
         await txn.insert('ventes', vente.toMap());
-
-        // Mettre à jour le stock seulement si la vente est validée (état 2) ou incomplète (état 3)
         if (vente.etat == 2 || vente.etat == 3) {
           await _updateStockForVente(txn, vente, userId, isAdding: true);
         }
       });
 
-      state = await AsyncValue.guard(loadVentes);
+      // CHANGEZ: utiliser _loadVentes au lieu de loadVentes
+      if (_currentEntrepriseId == vente.entrepriseId) {
+        state = await AsyncValue.guard(() => _loadVentes(entrepriseId: vente.entrepriseId));
+      }
     } catch (e, stack) {
       print('Error adding vente: $e\n$stack');
       state = AsyncValue.error(e, stack);
@@ -70,12 +70,12 @@ Future<Map<String, List<Vente>>> getVentesGroupedByClient() async {
     }
   }
 
+  // MODIFIEZ updateVente pour utiliser _loadVentes
   Future<void> updateVente(Vente vente, String userId) async {
     try {
       state = const AsyncValue.loading();
       final db = await _dbHelper.database;
 
-      // Récupérer l'ancienne vente
       final ancienneVenteResult = await db.query(
         'ventes',
         where: 'id = ?',
@@ -89,80 +89,32 @@ Future<Map<String, List<Vente>>> getVentesGroupedByClient() async {
       final ancienneVente = Vente.fromMap(ancienneVenteResult.first);
 
       await db.transaction((txn) async {
-        // Mettre à jour la vente
         await txn.update(
           'ventes',
           vente.toMap(),
           where: 'id = ?',
           whereArgs: [vente.id],
         );
-
-        // Gestion des changements d'état et de quantité
         await _handleStateAndQuantityChanges(txn, ancienneVente, vente, userId);
       });
 
-      state = await AsyncValue.guard(loadVentes);
+      // CHANGEZ: utiliser _loadVentes au lieu de loadVentes
+      if (_currentEntrepriseId == vente.entrepriseId) {
+        state = await AsyncValue.guard(() => _loadVentes(entrepriseId: vente.entrepriseId));
+      }
     } catch (e, stack) {
       print('Error updating vente: $e\n$stack');
       state = AsyncValue.error(e, stack);
       rethrow;
     }
-  }// Ajoutez cette méthode à votre VenteController
-Future<Map<String, List<Vente>>> getVentesGrouped() async {
-  final ventes = await loadVentes();
-  return groupVentesByClientAndDate(ventes);
-}
-
-  Future<void> updateVenteEtat(String venteId, int newEtat, String userId) async {
-    try {
-      state = const AsyncValue.loading();
-      final db = await _dbHelper.database;
-
-      // Récupérer la vente actuelle
-      final venteResult = await db.query(
-        'ventes',
-        where: 'id = ?',
-        whereArgs: [venteId],
-      );
-      
-      if (venteResult.isEmpty) {
-        throw Exception('Vente non trouvée');
-      }
-      
-      final vente = Vente.fromMap(venteResult.first);
-
-      await db.transaction((txn) async {
-        // Mettre à jour l'état
-        await txn.update(
-          'ventes',
-          {
-            'etat': newEtat,
-            'updated_at': DateTime.now().toIso8601String(),
-          },
-          where: 'id = ?',
-          whereArgs: [venteId],
-        );
-
-        // Gestion du changement d'état
-        if (vente.etat != newEtat) {
-          await _handleEtatChange(txn, vente, newEtat, userId);
-        }
-      });
-
-      state = await AsyncValue.guard(loadVentes);
-    } catch (e, stack) {
-      print('Error updating vente etat: $e\n$stack');
-      state = AsyncValue.error(e, stack);
-      rethrow;
-    }
   }
 
+  // MODIFIEZ deleteVente pour utiliser _loadVentes
   Future<void> deleteVente(String id, String userId) async {
     try {
       state = const AsyncValue.loading();
       final db = await _dbHelper.database;
 
-      // Récupérer la vente avant suppression
       final venteResult = await db.query(
         'ventes',
         where: 'id = ?',
@@ -173,27 +125,24 @@ Future<Map<String, List<Vente>>> getVentesGrouped() async {
         final vente = Vente.fromMap(venteResult.first);
 
         await db.transaction((txn) async {
-          // Supprimer la vente
-          await txn.delete(
-            'ventes',
-            where: 'id = ?',
-            whereArgs: [id],
-          );
-
-          // Restaurer le stock seulement si la vente était validée (état 2) ou incomplète (état 3)
+          await txn.delete('ventes', where: 'id = ?', whereArgs: [id]);
           if (vente.etat == 2 || vente.etat == 3) {
             await _updateStockForVente(txn, vente, userId, isAdding: false);
           }
         });
-      }
 
-      state = await AsyncValue.guard(loadVentes);
+        // CHANGEZ: utiliser _loadVentes au lieu de loadVentes
+        if (_currentEntrepriseId == vente.entrepriseId) {
+          state = await AsyncValue.guard(() => _loadVentes(entrepriseId: vente.entrepriseId));
+        }
+      }
     } catch (e, stack) {
       print('Error deleting vente: $e\n$stack');
       state = AsyncValue.error(e, stack);
       rethrow;
     }
   }
+
 
   // Méthodes helper pour la gestion du stock
   Future<void> _updateStockForVente(Transaction txn, Vente vente, String userId, {required bool isAdding}) async {

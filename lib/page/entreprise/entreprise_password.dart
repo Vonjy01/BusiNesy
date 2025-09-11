@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:project6/controller/entreprise_controller.dart';
 import 'package:project6/page/home_page.dart';
+import 'package:project6/utils/constant.dart';
+import 'package:project6/widget/logo.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class EntreprisePasswordPage extends ConsumerStatefulWidget {
@@ -22,83 +24,126 @@ class _EntreprisePasswordPageState extends ConsumerState<EntreprisePasswordPage>
   final _formKey = GlobalKey<FormState>();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
-  bool _showPassword = false;
+  bool _obscurePassword = true;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 20),
-              Center(
-                child: Icon(
-                  Icons.business,
-                  size: 64,
-                  color: Theme.of(context).primaryColor,
-                ),
+    return  Container(
+      decoration: BoxDecoration(gradient: headerGradient),
+      child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24.0),
+            child: Card(
+              elevation: 8,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
               ),
-              const SizedBox(height: 20),
-              Center(
-                child: Text(
-                  widget.entrepriseNom,
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-              const SizedBox(height: 30),
-              const Text(
-                'Entrez le mot de passe pour accéder à cette entreprise',
-                style: TextStyle(fontSize: 16),
-              ),
-              const SizedBox(height: 20),
-              TextFormField(
-                controller: _passwordController,
-                decoration: InputDecoration(
-                  labelText: 'Mot de passe',
-                  border: const OutlineInputBorder(),
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _showPassword ? Icons.visibility : Icons.visibility_off,
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        _showPassword = !_showPassword;
-                      });
-                    },
-                  ),
-                ),
-                obscureText: !_showPassword,
-                validator: (value) => value!.isEmpty ? 'Champ obligatoire' : null,
-              ),
-              const SizedBox(height: 30),
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _verifyPassword,
-                  child: _isLoading 
-                    ? const CircularProgressIndicator()
-                    : const Text('Accéder à l\'entreprise'),
-                ),
-              ),
-              const SizedBox(height: 20),
-              TextButton(
-                onPressed: _isLoading 
-                    ? null 
-                    : () => Navigator.of(context).pop(),
-                child: const Text('Choisir une autre entreprise'),
-              ),
-            ],
-          ),
-        ),
+              child: Padding(
+                padding: const EdgeInsets.all(32.0),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                     Logo(size: 80,),
+                      const SizedBox(height: 24),
+                      
+                      // Nom de l'entreprise
+                      Text(
+                        widget.entrepriseNom,
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: background_theme,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 12),
+                      
+                      // Message
+                      const Text(
+                        'Entrez le mot de passe pour accéder à cette entreprise',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Colors.grey,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 32),
       
+                      // Champ mot de passe
+                      TextFormField(
+                        controller: _passwordController,
+                        decoration: InputDecoration(
+                          labelText: 'Mot de passe de l\'entreprise',
+                          prefixIcon: const Icon(Icons.lock_outline),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                              color: Colors.grey,
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                _obscurePassword = !_obscurePassword;
+                              });
+                            },
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          filled: true,
+                          fillColor: Colors.grey.shade50,
+                        ),
+                        obscureText: _obscurePassword,
+                        validator: (value) => value!.isEmpty ? 'Le mot de passe est requis' : null,
+                      ),
+                      const SizedBox(height: 32),
+      
+                      // Bouton d'accès
+                      SizedBox(
+                        width: double.infinity,
+                        height: 56,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: background_theme,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 4,
+                          ),
+                          onPressed: _isLoading ? null : _verifyPassword,
+                          child: _isLoading
+                              ? const CircularProgressIndicator(color: Colors.white)
+                              : const Text(
+                                  'Accéder à l\'entreprise',
+                                  style: TextStyle(fontSize: 18),
+                                ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+      
+                      // Bouton retour
+                      TextButton(
+                        onPressed: _isLoading 
+                            ? null 
+                            : () => Navigator.of(context).pop(),
+                        child: const Text(
+                          '← Choisir une autre entreprise',
+                          style: TextStyle(
+                            color: background_theme,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        
+      ),
     );
   }
 
@@ -116,7 +161,6 @@ class _EntreprisePasswordPageState extends ConsumerState<EntreprisePasswordPage>
         await prefs.setString("entrepriseId", widget.entrepriseId);
         await prefs.setString("entrepriseNom", widget.entrepriseNom);
 
-        // Mettre l'entreprise active dans la DB
         await ref
             .read(entrepriseControllerProvider.notifier)
             .setActiveEntreprise(widget.entrepriseId);
@@ -133,6 +177,7 @@ class _EntreprisePasswordPageState extends ConsumerState<EntreprisePasswordPage>
             const SnackBar(
               content: Text('Mot de passe incorrect'),
               backgroundColor: Colors.red,
+              behavior: SnackBarBehavior.floating,
             ),
           );
         }
@@ -143,6 +188,8 @@ class _EntreprisePasswordPageState extends ConsumerState<EntreprisePasswordPage>
           SnackBar(
             content: Text('Erreur: ${e.toString()}'),
             backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
         );
       }

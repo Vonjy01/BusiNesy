@@ -732,14 +732,20 @@ class _VenteDetailPageState extends ConsumerState<VenteDetailPage> {
                     style: const TextStyle(color: Colors.white, fontSize: 16),
                   ),
                 const SizedBox(height: 8),
-                Text(
-                  'Total: ${_totalGeneral.toStringAsFixed(2)} $devise',
-                  style: const TextStyle(color: Colors.white, fontSize: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'T : ${_totalGeneral.toStringAsFixed(0)} $devise',
+                      style: const TextStyle(color: Colors.white, fontSize: 15),
+                    ),
+                    Text(
+                  'B : ${_beneficeTotal.toStringAsFixed(0)} $devise',
+                  style: const TextStyle(color: Colors.white, fontSize:15 ),
                 ),
-                Text(
-                  'Bénéfice: ${_beneficeTotal.toStringAsFixed(2)} $devise',
-                  style: const TextStyle(color: Colors.white, fontSize: 16),
+                  ],
                 ),
+                
               ],
             ),
             actions: [

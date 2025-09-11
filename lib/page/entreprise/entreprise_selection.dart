@@ -17,7 +17,7 @@ class EntrepriseSelectionPage extends ConsumerWidget {
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
-        title: const Text('Sélection entreprise'),
+        title: const Text('Entreprise'),
         backgroundColor: Colors.white,
         foregroundColor: background_theme,
         elevation: 2,
@@ -81,7 +81,7 @@ class EntrepriseSelectionPage extends ConsumerWidget {
               child: const Icon(
                 Icons.business,
                 size: 60,
-                color: color_white,
+                color: background_theme,
               ),
             ),
             const SizedBox(height: 24),

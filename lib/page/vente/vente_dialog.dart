@@ -395,75 +395,74 @@ class _VenteDetailPageState extends ConsumerState<VenteDetailPage> {
     );
   }
 
-  Widget _buildAjouterProduitDialog() {
-    return Consumer(
-      builder: (context, ref, child) {
-        final categoriesState = ref.watch(categorieProduitControllerProvider);
-        final produitsState = ref.watch(produitControllerProvider);
-        final etatsState = ref.watch(etatCommandeProvider);
-        
-        int? selectedCategorieId = _currentCategorieId;
-        CategorieProduit? selectedCategorie;
-        
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              title: const Text('Ajouter un produit'),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Sélection de la catégorie
-                    categoriesState.when(
-                      loading: () => const CircularProgressIndicator(),
-                      error: (error, stack) => Text('Erreur: $error'),
-                      data: (categories) {
-                        if (selectedCategorieId != null) {
-                          try {
-                            selectedCategorie = categories.firstWhere(
-                              (c) => c.id == selectedCategorieId,
-                            );
-                          } catch (e) {
-                            selectedCategorie = null;
-                          }
+ Widget _buildAjouterProduitDialog() {
+  return Consumer(
+    builder: (context, ref, child) {
+      final categoriesState = ref.watch(categorieProduitControllerProvider);
+      final produitsState = ref.watch(produitControllerProvider);
+      final etatsState = ref.watch(etatCommandeProvider);
+      
+      int? selectedCategorieId = _currentCategorieId;
+      CategorieProduit? selectedCategorie;
+      
+      return StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            title: const Text('Ajouter un produit'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Sélection de la catégorie (OBLIGATOIRE)
+                  categoriesState.when(
+                    loading: () => const CircularProgressIndicator(),
+                    error: (error, stack) => Text('Erreur: $error'),
+                    data: (categories) {
+                      if (selectedCategorieId != null) {
+                        try {
+                          selectedCategorie = categories.firstWhere(
+                            (c) => c.id == selectedCategorieId,
+                          );
+                        } catch (e) {
+                          selectedCategorie = null;
                         }
-                        
-                        return DropdownSearch<CategorieProduit>(
-                          items: categories,
-                          selectedItem: selectedCategorie,
-                          itemAsString: (CategorieProduit c) => c.libelle,
-                          popupProps: const PopupProps.menu(
-                            showSearchBox: true,
-                            searchDelay: Duration(milliseconds: 300),
+                      }
+                      
+                      return DropdownSearch<CategorieProduit>(
+                        items: categories,
+                        selectedItem: selectedCategorie,
+                        itemAsString: (CategorieProduit c) => c.libelle,
+                        popupProps: const PopupProps.menu(
+                          showSearchBox: true,
+                          searchDelay: Duration(milliseconds: 300),
+                        ),
+                        onChanged: (CategorieProduit? value) {
+                          setDialogState(() {
+                            selectedCategorie = value;
+                            selectedCategorieId = value?.id;
+                            _currentCategorieId = value?.id;
+                          });
+                        },
+                        dropdownDecoratorProps: const DropDownDecoratorProps(
+                          dropdownSearchDecoration: InputDecoration(
+                            labelText: 'Catégorie *',
+                            border: OutlineInputBorder(),
                           ),
-                          onChanged: (CategorieProduit? value) {
-                            setDialogState(() {
-                              selectedCategorie = value;
-                              selectedCategorieId = value?.id;
-                              _currentCategorieId = value?.id;
-                            });
-                          },
-                          dropdownDecoratorProps: const DropDownDecoratorProps(
-                            dropdownSearchDecoration: InputDecoration(
-                              labelText: 'Catégorie',
-                              border: OutlineInputBorder(),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    
-                    // Sélection du produit - SEULEMENT les produits de la catégorie sélectionnée
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  
+                  // Sélection du produit - UNIQUEMENT si une catégorie est sélectionnée
+                  if (selectedCategorieId != null)
                     produitsState.when(
                       loading: () => const CircularProgressIndicator(),
                       error: (error, stack) => Text('Erreur: $error'),
                       data: (produits) {
                         _produits = produits;
-                        // Afficher seulement les produits de la catégorie sélectionnée
-                        List<Produit> produitsFiltres = selectedCategorieId == null 
-                            ? [] // Aucun produit si aucune catégorie n'est sélectionnée
-                            : produits.where((p) => p.categorieId == selectedCategorieId).toList();
+                        // Filtrer les produits par la catégorie sélectionnée
+                        List<Produit> produitsFiltres = produits.where((p) => p.categorieId == selectedCategorieId).toList();
                         
                         return DropdownSearch<Produit>(
                           items: produitsFiltres,
@@ -473,11 +472,9 @@ class _VenteDetailPageState extends ConsumerState<VenteDetailPage> {
                             showSearchBox: true,
                             searchDelay: const Duration(milliseconds: 300),
                             emptyBuilder: (context, searchEntry) {
-                              return ListTile(
-                                title: const Text('Aucun produit trouvé'),
-                                subtitle: selectedCategorieId == null
-                                    ? const Text('Veuillez sélectionner une catégorie')
-                                    : const Text('Aucun produit dans cette catégorie'),
+                              return const ListTile(
+                                title: Text('Aucun produit trouvé'),
+                                subtitle: Text('Aucun produit dans cette catégorie'),
                               );
                             },
                           ),
@@ -491,41 +488,51 @@ class _VenteDetailPageState extends ConsumerState<VenteDetailPage> {
                         );
                       },
                     ),
+                  
+                  // Message si aucune catégorie n'est sélectionnée
+                  if (selectedCategorieId == null)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 16.0),
+                      child: Text(
+                        'Veuillez d\'abord sélectionner une catégorie',
+                        style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
                     const SizedBox(height: 12),
 
                     // Sélection de l'état - DANS LE DIALOG
-                    etatsState.when(
-                      loading: () => const CircularProgressIndicator(),
-                      error: (error, stack) => Text('Erreur: $error'),
-                      data: (etats) {
-                        return DropdownButtonFormField<int>(
-                          value: _currentEtat,
-                          decoration: const InputDecoration(
-                            labelText: 'État *',
-                            border: OutlineInputBorder(),
-                          ),
-                          items: etats.map((etat) {
-                            return DropdownMenuItem(
-                              value: etat.id,
-                              child: Text(etat.libelle),
-                            );
-                          }).toList(),
-                          onChanged: (value) {
-                            setDialogState(() {
-                              _currentEtat = value!;
-                              // Activer/désactiver le champ produit revenu selon l'état
-                              if (value == 2 || value == 3) {
-                                _produitRevenuController.text = '0';
-                              } else {
-                                _produitRevenuController.text = '0';
-                                _currentProduitRevenu = 0;
-                              }
-                            });
-                          },
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 12),
+                   etatsState.when(
+                    loading: () => const CircularProgressIndicator(),
+                    error: (error, stack) => Text('Erreur: $error'),
+                    data: (etats) {
+                      return DropdownButtonFormField<int>(
+                        value: _currentEtat,
+                        decoration: const InputDecoration(
+                          labelText: 'État *',
+                          border: OutlineInputBorder(),
+                        ),
+                        items: etats.map((etat) {
+                          return DropdownMenuItem(
+                            value: etat.id,
+                            child: Text(etat.libelle),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          setDialogState(() {
+                            _currentEtat = value!;
+                            if (value == 2 || value == 3) {
+                              _produitRevenuController.text = '0';
+                            } else {
+                              _produitRevenuController.text = '0';
+                              _currentProduitRevenu = 0;
+                            }
+                          });
+                        },
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 12),
 
                     if (_currentProduitId != null) 
                       produitsState.when(
@@ -574,62 +581,62 @@ class _VenteDetailPageState extends ConsumerState<VenteDetailPage> {
 
                     const SizedBox(height: 12),
 
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextFormField(
-                            controller: _quantiteController,
-                            decoration: const InputDecoration(
-                              labelText: 'Quantité *',
-                              border: OutlineInputBorder(),
-                            ),
-                            keyboardType: TextInputType.number,
-                            onChanged: (value) {
-                              setState(() {
-                                _currentQuantite = int.tryParse(value) ?? 1;
-                              });
-                            },
+                                      Row(
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: _quantiteController,
+                          decoration: const InputDecoration(
+                            labelText: 'Quantité *',
+                            border: OutlineInputBorder(),
                           ),
+                          keyboardType: TextInputType.number,
+                          onChanged: (value) {
+                            setState(() {
+                              _currentQuantite = int.tryParse(value) ?? 1;
+                            });
+                          },
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: TextFormField(
-                            controller: _produitRevenuController,
-                            decoration: const InputDecoration(
-                              labelText: 'Produit revenu',
-                              border: OutlineInputBorder(),
-                            ),
-                            keyboardType: TextInputType.number,
-                            onChanged: (value) {
-                              setState(() {
-                                _currentProduitRevenu = int.tryParse(value) ?? 0;
-                              });
-                            },
-                            enabled: _currentEtat == 2 || _currentEtat == 3,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextFormField(
+                          controller: _produitRevenuController,
+                          decoration: const InputDecoration(
+                            labelText: 'Produit revenu',
+                            border: OutlineInputBorder(),
                           ),
+                          keyboardType: TextInputType.number,
+                          onChanged: (value) {
+                            setState(() {
+                              _currentProduitRevenu = int.tryParse(value) ?? 0;
+                            });
+                          },
+                          enabled: _currentEtat == 2 || _currentEtat == 3,
                         ),
-                      ],
-                    ),
-                    
-                  ],
-                ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Annuler'),
-                ),
-                ElevatedButton(
-                  onPressed: _ajouterProduit,
-                  child: const Text('Ajouter'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Annuler'),
+              ),
+              ElevatedButton(
+                onPressed: _ajouterProduit,
+                child: const Text('Ajouter'),
+              ),
+            ],
+          );
+        },
+      );
+    },
+  );
+}
+
 
   double get _totalGeneral {
     return _venteItems.fold(0, (sum, item) => sum + item.prixTotal);

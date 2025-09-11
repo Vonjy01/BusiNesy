@@ -14,6 +14,7 @@ import 'package:project6/page/home_page.dart';
 import 'package:project6/page/produit/produit_list.dart';
 import 'package:project6/page/vente/vente_list.dart';
 import 'package:project6/utils/constant.dart';
+import 'package:project6/widget/logo.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AppDrawer extends ConsumerWidget {
@@ -40,10 +41,7 @@ class AppDrawer extends ConsumerWidget {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const CircleAvatar(
-                      radius: 40,
-                      backgroundImage: AssetImage(logo_path),
-                    ),
+                    Logo(size: 90),
                     const SizedBox(width: 15),
                     Expanded(
                       child: Column(
@@ -176,15 +174,21 @@ class AppDrawer extends ConsumerWidget {
                     const HomePage(),
                   ),
                   ListTile(
-                    leading: const Icon(Icons.business),
+                    leading: CircleAvatar(
+                      backgroundColor: background_theme,
+                      radius: 20,
+                      child: Icon(Icons.business, color: color_white,),
+                    ),
                     title: const Text('Changer d\'entreprise'),
                     onTap: () async {
                       final prefs = await SharedPreferences.getInstance();
                       await prefs.remove("entrepriseId");
                       await prefs.remove("entrepriseNom");
-                      
+
                       Navigator.of(context).pushAndRemoveUntil(
-                        MaterialPageRoute(builder: (_) => const EntrepriseSelectionPage()),
+                        MaterialPageRoute(
+                          builder: (_) => const EntrepriseSelectionPage(),
+                        ),
                         (route) => false,
                       );
                     },
@@ -196,25 +200,31 @@ class AppDrawer extends ConsumerWidget {
                     const HomePage(),
                   ),
                   const Divider(),
- ListTile(
-  leading: const Icon(Icons.exit_to_app),
-  title: const Text("Déconnexion"),
-  onTap: () async {
-    await ref.read(authControllerProvider.notifier).logout();
+                  ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: background_theme,
+                      radius: 20,
+                      child: Icon(Icons.exit_to_app, color: color_white,),
+                    ),
+                    title: const Text("Déconnexion"),
+                    onTap: () async {
+                      await ref.read(authControllerProvider.notifier).logout();
 
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove("entrepriseId");
-    await prefs.remove("entrepriseNom");
-    await prefs.setBool('first_run', true);
+                      final prefs = await SharedPreferences.getInstance();
+                      await prefs.remove("entrepriseId");
+                      await prefs.remove("entrepriseNom");
+                      await prefs.setBool('first_run', true);
 
-    if (context.mounted) {
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const LoginScreen()), // Utilisez MaterialPageRoute directement
-        (route) => false,
-      );
-    }
-  }
-),
+                      if (context.mounted) {
+                        Navigator.of(context).pushAndRemoveUntil(
+                          MaterialPageRoute(
+                            builder: (_) => const LoginScreen(),
+                          ), // Utilisez MaterialPageRoute directement
+                          (route) => false,
+                        );
+                      }
+                    },
+                  ),
                   const Padding(
                     padding: EdgeInsets.all(16),
                     child: Text(

@@ -10,21 +10,32 @@ final fournisseurControllerProvider = AsyncNotifierProvider<FournisseurControlle
 class FournisseurController extends AsyncNotifier<List<Fournisseur>> {
   final _dbHelper = DatabaseHelper.instance;
   final _uuid = Uuid();
+  String? _currentEntrepriseId;
 
   @override
   Future<List<Fournisseur>> build() async {
-    return _loadFournisseurs();
+    // Retourner une liste vide au début
+    return [];
   }
 
-  Future<List<Fournisseur>> _loadFournisseurs({String? entrepriseId}) async {
+  Future<void> loadFournisseurs(String entrepriseId) async {
+    // Éviter de recharger si c'est la même entreprise
+    if (_currentEntrepriseId == entrepriseId && state is! AsyncError) {
+      return;
+    }
+    
+    _currentEntrepriseId = entrepriseId;
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() => _loadFournisseurs(entrepriseId: entrepriseId));
+  }
+
+  Future<List<Fournisseur>> _loadFournisseurs({required String entrepriseId}) async {
     final db = await _dbHelper.database;
-    final where = entrepriseId != null ? 'entreprise_id = ?' : null;
-    final whereArgs = entrepriseId != null ? [entrepriseId] : null;
     
     final fournisseurs = await db.query(
       'fournisseurs',
-      where: where,
-      whereArgs: whereArgs,
+      where: 'entreprise_id = ?',
+      whereArgs: [entrepriseId],
       orderBy: 'nom ASC',
     );
 
@@ -39,7 +50,6 @@ class FournisseurController extends AsyncNotifier<List<Fournisseur>> {
     String? adresse,
   }) async {
     try {
-      state = const AsyncLoading();
       final db = await _dbHelper.database;
 
       final fournisseur = Fournisseur(
@@ -53,7 +63,11 @@ class FournisseurController extends AsyncNotifier<List<Fournisseur>> {
       );
 
       await db.insert('fournisseurs', fournisseur.toMap());
-      state = await AsyncValue.guard(() => _loadFournisseurs(entrepriseId: entrepriseId));
+      
+      // Recharger seulement si c'est la même entreprise
+      if (_currentEntrepriseId == entrepriseId) {
+        state = await AsyncValue.guard(() => _loadFournisseurs(entrepriseId: entrepriseId));
+      }
     } catch (e, stack) {
       state = AsyncError(e, stack);
       rethrow;
@@ -62,7 +76,6 @@ class FournisseurController extends AsyncNotifier<List<Fournisseur>> {
 
   Future<void> updateFournisseur(Fournisseur fournisseur) async {
     try {
-      state = const AsyncLoading();
       final db = await _dbHelper.database;
 
       final updatedFournisseur = fournisseur.copyWith(
@@ -76,7 +89,10 @@ class FournisseurController extends AsyncNotifier<List<Fournisseur>> {
         whereArgs: [fournisseur.id],
       );
 
-      state = await AsyncValue.guard(() => _loadFournisseurs(entrepriseId: fournisseur.entrepriseId));
+      // Recharger seulement si c'est la même entreprise
+      if (_currentEntrepriseId == fournisseur.entrepriseId) {
+        state = await AsyncValue.guard(() => _loadFournisseurs(entrepriseId: fournisseur.entrepriseId));
+      }
     } catch (e, stack) {
       state = AsyncError(e, stack);
       rethrow;
@@ -85,7 +101,6 @@ class FournisseurController extends AsyncNotifier<List<Fournisseur>> {
 
   Future<void> deleteFournisseur(String id, String entrepriseId) async {
     try {
-      state = const AsyncLoading();
       final db = await _dbHelper.database;
 
       await db.delete(
@@ -94,7 +109,10 @@ class FournisseurController extends AsyncNotifier<List<Fournisseur>> {
         whereArgs: [id],
       );
 
-      state = await AsyncValue.guard(() => _loadFournisseurs(entrepriseId: entrepriseId));
+      // Recharger seulement si c'est la même entreprise
+      if (_currentEntrepriseId == entrepriseId) {
+        state = await AsyncValue.guard(() => _loadFournisseurs(entrepriseId: entrepriseId));
+      }
     } catch (e, stack) {
       state = AsyncError(e, stack);
       rethrow;
@@ -111,27 +129,5 @@ class FournisseurController extends AsyncNotifier<List<Fournisseur>> {
     );
 
     return result.isEmpty ? null : Fournisseur.fromMap(result.first);
-  }
-}
-
-// Extension pour faciliter la mise à jour
-extension FournisseurCopyWith on Fournisseur {
-  Fournisseur copyWith({
-    String? nom,
-    String? telephone,
-    String? email,
-    String? adresse,
-    DateTime? updatedAt,
-  }) {
-    return Fournisseur(
-      id: id,
-      nom: nom ?? this.nom,
-      telephone: telephone ?? this.telephone,
-      email: email ?? this.email,
-      adresse: adresse ?? this.adresse,
-      entrepriseId: entrepriseId,
-      createdAt: createdAt,
-      updatedAt: updatedAt ?? this.updatedAt,
-    );
   }
 }

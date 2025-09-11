@@ -1,4 +1,3 @@
-// controller/client_controller.dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:project6/models/client_model.dart';
 import 'package:project6/services/database_helper.dart';
@@ -11,21 +10,31 @@ final clientControllerProvider = AsyncNotifierProvider<ClientController, List<Cl
 class ClientController extends AsyncNotifier<List<Client>> {
   final DatabaseHelper _dbHelper = DatabaseHelper.instance;
   final Uuid _uuid = const Uuid();
+  String? _currentEntrepriseId;
 
   @override
   Future<List<Client>> build() async {
-    return await _loadClients();
+    return [];
   }
 
-  Future<List<Client>> _loadClients({String? entrepriseId}) async {
+  Future<void> loadClients(String entrepriseId) async {
+    // Éviter de recharger si c'est la même entreprise
+    if (_currentEntrepriseId == entrepriseId && state is! AsyncError) {
+      return;
+    }
+    
+    _currentEntrepriseId = entrepriseId;
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() => _loadClients(entrepriseId: entrepriseId));
+  }
+
+  Future<List<Client>> _loadClients({required String entrepriseId}) async {
     final db = await _dbHelper.database;
-    final where = entrepriseId != null ? 'entreprise_id = ?' : null;
-    final whereArgs = entrepriseId != null ? [entrepriseId] : null;
     
     final clients = await db.query(
       'clients',
-      where: where,
-      whereArgs: whereArgs,
+      where: 'entreprise_id = ?',
+      whereArgs: [entrepriseId],
       orderBy: 'nom ASC',
     );
 
@@ -41,7 +50,6 @@ class ClientController extends AsyncNotifier<List<Client>> {
     String? description,
   }) async {
     try {
-      state = const AsyncValue.loading();
       final db = await _dbHelper.database;
 
       final client = Client(
@@ -56,7 +64,11 @@ class ClientController extends AsyncNotifier<List<Client>> {
       );
 
       await db.insert('clients', client.toMap());
-      state = await AsyncValue.guard(() => _loadClients(entrepriseId: entrepriseId));
+      
+      // Recharger seulement si c'est la même entreprise
+      if (_currentEntrepriseId == entrepriseId) {
+        state = await AsyncValue.guard(() => _loadClients(entrepriseId: entrepriseId));
+      }
     } catch (e, stack) {
       state = AsyncValue.error(e, stack);
       rethrow;
@@ -65,7 +77,6 @@ class ClientController extends AsyncNotifier<List<Client>> {
 
   Future<void> updateClient(Client client) async {
     try {
-      state = const AsyncValue.loading();
       final db = await _dbHelper.database;
 
       final updatedClient = client.copyWith(
@@ -79,7 +90,10 @@ class ClientController extends AsyncNotifier<List<Client>> {
         whereArgs: [client.id],
       );
 
-      state = await AsyncValue.guard(() => _loadClients(entrepriseId: client.entrepriseId));
+      // Recharger seulement si c'est la même entreprise
+      if (_currentEntrepriseId == client.entrepriseId) {
+        state = await AsyncValue.guard(() => _loadClients(entrepriseId: client.entrepriseId));
+      }
     } catch (e, stack) {
       state = AsyncValue.error(e, stack);
       rethrow;
@@ -88,7 +102,6 @@ class ClientController extends AsyncNotifier<List<Client>> {
 
   Future<void> deleteClient(String id, String entrepriseId) async {
     try {
-      state = const AsyncValue.loading();
       final db = await _dbHelper.database;
 
       await db.update(
@@ -104,7 +117,10 @@ class ClientController extends AsyncNotifier<List<Client>> {
         whereArgs: [id],
       );
 
-      state = await AsyncValue.guard(() => _loadClients(entrepriseId: entrepriseId));
+      // Recharger seulement si c'est la même entreprise
+      if (_currentEntrepriseId == entrepriseId) {
+        state = await AsyncValue.guard(() => _loadClients(entrepriseId: entrepriseId));
+      }
     } catch (e, stack) {
       state = AsyncValue.error(e, stack);
       rethrow;
@@ -121,29 +137,5 @@ class ClientController extends AsyncNotifier<List<Client>> {
     );
 
     return result.isEmpty ? null : Client.fromMap(result.first);
-  }
-}
-
-// Extension pour Client
-extension ClientCopyWith on Client {
-  Client copyWith({
-    String? nom,
-    String? telephone,
-    String? email,
-    String? adresse,
-    String? description,
-    DateTime? updatedAt,
-  }) {
-    return Client(
-      id: id,
-      nom: nom ?? this.nom,
-      telephone: telephone ?? this.telephone,
-      email: email ?? this.email,
-      adresse: adresse ?? this.adresse,
-      entrepriseId: entrepriseId,
-      description: description ?? this.description,
-      createdAt: createdAt,
-      updatedAt: updatedAt ?? this.updatedAt,
-    );
   }
 }

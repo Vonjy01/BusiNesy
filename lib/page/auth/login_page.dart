@@ -4,6 +4,7 @@ import 'package:project6/controller/auth_controller.dart';
 import 'package:project6/page/entreprise/entreprise_selection.dart';
 import 'package:project6/page/register.dart';
 import 'package:project6/utils/constant.dart';
+import 'package:project6/widget/logo.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -42,18 +43,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        // Logo/Icon
-                        Container(
-                          width: 100,
-                          height: 100,
-                          decoration: BoxDecoration(
-                            color: background_theme,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Image.asset(logo_path)
-                        ),
-                        const SizedBox(height: 24),
-                        
+                       Logo(size : 80),
                         // Titre
                         const Text(
                           'Connexion',

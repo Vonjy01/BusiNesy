@@ -44,4 +44,25 @@ class Fournisseur {
       'updated_at': updatedAt?.toIso8601String(),
     };
   }
+    Fournisseur copyWith({
+    String? id,
+    String? nom,
+    String? telephone,
+    String? email,
+    String? adresse,
+    String? entrepriseId,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) {
+    return Fournisseur(
+      id: id ?? this.id,
+      nom: nom ?? this.nom,
+      telephone: telephone ?? this.telephone,
+      email: email ?? this.email,
+      adresse: adresse ?? this.adresse,
+      entrepriseId: entrepriseId ?? this.entrepriseId,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
 }

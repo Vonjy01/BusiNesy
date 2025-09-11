@@ -50,4 +50,28 @@ class Client {
           : null,
     );
   }
+
+    Client copyWith({
+    String? id,
+    String? nom,
+    String? telephone,
+    String? email,
+    String? adresse,
+    String? entrepriseId,
+    String? description,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) {
+    return Client(
+      id: id ?? this.id,
+      nom: nom ?? this.nom,
+      telephone: telephone ?? this.telephone,
+      email: email ?? this.email,
+      adresse: adresse ?? this.adresse,
+      entrepriseId: entrepriseId ?? this.entrepriseId,
+      description: description ?? this.description,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
 }
