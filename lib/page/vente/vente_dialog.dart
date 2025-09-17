@@ -218,36 +218,39 @@ class _VenteDialogState extends ConsumerState<VenteDialog> {
             const SizedBox(height: 12),
 
             // Sélection de l'état
-            etatsState.when(
-              loading: () => const CircularProgressIndicator(),
-              error: (error, stack) => Text('Erreur: $error'),
-              data: (etats) {
-                return DropdownButtonFormField<int>(
-                  value: _currentEtat,
-                  decoration: const InputDecoration(
-                    labelText: 'État *',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: etats.map((etat) {
-                    return DropdownMenuItem(
-                      value: etat.id,
-                      child: Text(etat.libelle),
-                    );
-                  }).toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      _currentEtat = value!;
-                      if (value == 2 || value == 3) {
-                        _produitRevenuController.text = '0';
-                      } else {
-                        _produitRevenuController.text = '0';
-                        _currentProduitRevenu = 0;
-                      }
-                    });
-                  },
-                );
-              },
-            ),
+         // Dans _buildAjouterProduitDialog()
+etatsState.when(
+  loading: () => const CircularProgressIndicator(),
+  error: (error, stack) => Text('Erreur: $error'),
+  data: (etats) {
+    return DropdownButtonFormField<int>(
+      value: _currentEtat,
+      decoration: const InputDecoration(
+        labelText: 'État *',
+        border: OutlineInputBorder(),
+      ),
+      items: etats.map((etat) {
+        return DropdownMenuItem(
+          value: etat.id,
+          child: Text(etat.libelle), // Utilisez le libellé de la base
+        );
+      }).toList(),
+      onChanged: (value) {
+        setState(() {
+          
+        });(() {
+          _currentEtat = value!;
+          if (value == 2 || value == 3) {
+            _produitRevenuController.text = '0';
+          } else {
+            _produitRevenuController.text = '0';
+            _currentProduitRevenu = 0;
+          }
+        });
+      },
+    );
+  },
+),
             const SizedBox(height: 12),
 
             // Informations du produit sélectionné

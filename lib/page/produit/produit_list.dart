@@ -4,11 +4,13 @@ import 'package:project6/controller/auth_controller.dart';
 import 'package:project6/controller/cat_prod_controller.dart';
 import 'package:project6/controller/produit_controller.dart';
 import 'package:project6/models/categorie_produit_model.dart';
+import 'package:project6/models/entreprise_model.dart';
 import 'package:project6/models/produits_model.dart';
 import 'package:project6/models/user_model.dart';
 import 'package:project6/page/produit/produit_dialog.dart';
 import 'package:project6/page/produit/produit_search.dart';
 import 'package:project6/provider/entreprise_provider.dart';
+import 'package:project6/provider/produit_provider.dart';
 import 'package:project6/utils/constant.dart';
 import 'package:project6/widget/Header.dart';
 import 'package:project6/widget/app_drawer.dart';
@@ -131,100 +133,81 @@ class _ProduitListState extends ConsumerState<ProduitList> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final produitsState = ref.watch(produitControllerProvider);
-    final categoriesState = ref.watch(categorieProduitControllerProvider);
-    final authState = ref.watch(authControllerProvider);
-    final activeEntreprise = ref.watch(activeEntrepriseProvider).value;
+Widget build(BuildContext context) {
+  final authState = ref.watch(authControllerProvider);
+  final activeEntreprise = ref.watch(activeEntrepriseProvider).value;
 
-    // Recharger seulement si l'entreprise active change
-    if (activeEntreprise != null && _lastLoadedEntrepriseId != activeEntreprise.id) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _lastLoadedEntrepriseId = activeEntreprise.id;
-        ref.read(produitControllerProvider.notifier).loadProduits(activeEntreprise.id);
+  // Configurer l'écouteur pour les changements d'entreprise
+  ref.listen<AsyncValue<Entreprise?>>(
+    activeEntrepriseProvider,
+    (previous, next) {
+      next.whenData((entreprise) {
+        if (entreprise != null) {
+          ref.read(produitControllerProvider.notifier).loadProduits(entreprise.id);
+          ref.read(categorieProduitControllerProvider.notifier).loadCategories(entreprise.id);
+        }
       });
-    }
+    },
+  );
 
-    return authState.when(
-      loading: () => _buildLoadingScreen(),
-      error: (error, stack) => _buildErrorScreen(error),
-      data: (user) {
-        if (user == null) return _buildNoUserScreen();
+  return authState.when(
+    loading: () => _buildLoadingScreen(),
+    error: (error, stack) => _buildErrorScreen(error),
+    data: (user) {
+      if (user == null) return _buildNoUserScreen();
 
-        return categoriesState.when(
-          loading: () => _buildScaffold(
+      // Utiliser les nouveaux providers pour les données filtrées
+      final tousProduits = ref.watch(allProduitsProvider);
+      final stockBas = ref.watch(lowStockProduitsProvider);
+      final epuise = ref.watch(outOfStockProduitsProvider);
+      final defectueux = ref.watch(defectiveProduitsProvider);
+      final categoriesState = ref.watch(categorieProduitControllerProvider);
+
+      return categoriesState.when(
+        loading: () => _buildScaffold(
+          context,
+          user.id,
+          user: user,
+          tabViews: [
+            _buildLoadingTab(),
+            _buildLoadingTab(),
+            _buildLoadingTab(),
+            _buildLoadingTab(),
+          ],
+        ),
+        error: (error, stack) => _buildScaffold(
+          context,
+          user.id,
+          user: user,
+          tabViews: [
+            _buildErrorTab(error),
+            _buildErrorTab(error),
+            _buildErrorTab(error),
+            _buildErrorTab(error),
+          ],
+        ),
+        data: (categories) {
+          final filteredTous = _filterProduits(tousProduits, categories);
+          final filteredStockBas = _filterProduits(stockBas, categories);
+          final filteredEpuise = _filterProduits(epuise, categories);
+          final filteredDefectueux = _filterProduits(defectueux, categories);
+
+          return _buildScaffold(
             context,
             user.id,
             user: user,
             tabViews: [
-              _buildLoadingTab(),
-              _buildLoadingTab(),
-              _buildLoadingTab(),
-              _buildLoadingTab(),
+              _buildProduitList(filteredTous, categories, false, false, user.id),
+              _buildProduitList(filteredStockBas, categories, true, true, user.id),
+              _buildProduitList(filteredEpuise, categories, false, false, user.id),
+              _buildDefectiveList(filteredDefectueux, categories, user.id),
             ],
-          ),
-          error: (error, stack) => _buildScaffold(
-            context,
-            user.id,
-            user: user,
-            tabViews: [
-              _buildErrorTab(error),
-              _buildErrorTab(error),
-              _buildErrorTab(error),
-              _buildErrorTab(error),
-            ],
-          ),
-          data: (categories) {
-            return produitsState.when(
-              loading: () => _buildScaffold(
-                context,
-                user.id,
-                user: user,
-                tabViews: [
-                  _buildLoadingTab(),
-                  _buildLoadingTab(),
-                  _buildLoadingTab(),
-                  _buildLoadingTab(),
-                ],
-              ),
-              error: (error, stack) => _buildScaffold(
-                context,
-                user.id,
-                user: user,
-                tabViews: [
-                  _buildErrorTab(error),
-                  _buildErrorTab(error),
-                  _buildErrorTab(error),
-                  _buildErrorTab(error),
-                ],
-              ),
-              data: (produits) {
-                final filteredProduits = _filterProduits(produits, categories);
-                
-                final tousProduits = filteredProduits;
-                final stockBas = filteredProduits.where((p) => 
-                  p.stockDisponible > 0 && p.stockDisponible <= p.seuilAlerte).toList();
-                final epuise = filteredProduits.where((p) => p.stockDisponible <= 0).toList();
-                final defectueux = filteredProduits.where((p) => p.defectueux > 0).toList();
-
-                return _buildScaffold(
-                  context,
-                  user.id,
-                  user: user,
-                  tabViews: [
-                    _buildProduitList(tousProduits, categories, false, false, user.id),
-                    _buildProduitList(stockBas, categories, true, true, user.id),
-                    _buildProduitList(epuise, categories, false, false, user.id),
-                    _buildDefectiveList(defectueux, categories, user.id),
-                  ],
-                );
-              },
-            );
-          },
-        );
-      },
-    );
-  }
+          );
+        },
+      );
+    },
+  );
+}
 
   Widget _buildLoadingScreen() => const Scaffold(
         body: Center(child: CircularProgressIndicator()),
@@ -349,7 +332,12 @@ class _ProduitListState extends ConsumerState<ProduitList> {
     }
 
     return RefreshIndicator(
-      onRefresh: () => ref.refresh(produitControllerProvider.future),
+  onRefresh: () async {
+    final activeEntreprise = ref.read(activeEntrepriseProvider).value;
+    if (activeEntreprise != null) {
+      await ref.read(produitControllerProvider.notifier).refreshProduits();
+    }
+  },
       child: ListView.builder(
         padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10),
         itemCount: produits.length,

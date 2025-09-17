@@ -1,4 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:project6/controller/entreprise_controller.dart';
+import 'package:project6/models/entreprise_model.dart';
 import 'package:project6/models/produits_model.dart';
 import 'package:project6/services/database_helper.dart';
 import 'package:uuid/uuid.dart';
@@ -14,8 +16,32 @@ class ProduitController extends AsyncNotifier<List<Produit>> {
 
   @override
   Future<List<Produit>> build() async {
-    // Retourner une liste vide au début
-    return [];
+    // Écouter les changements d'entreprise
+    ref.listen<AsyncValue<Entreprise?>>(
+      activeEntrepriseProvider,
+      (previous, next) {
+        next.whenData((entreprise) {
+          if (entreprise != null && _currentEntrepriseId != entreprise.id) {
+            loadProduits(entreprise.id);
+          }
+        });
+      },
+    );
+
+    final activeEntreprise = ref.read(activeEntrepriseProvider).value;
+    if (activeEntreprise == null) {
+      return [];
+    }
+    
+    _currentEntrepriseId = activeEntreprise.id;
+    return await _loadProduits(entrepriseId: activeEntreprise.id);
+  }
+
+  Future<void> refreshProduits() async {
+    if (_currentEntrepriseId != null) {
+      state = const AsyncLoading();
+      state = await AsyncValue.guard(() => _loadProduits(entrepriseId: _currentEntrepriseId!));
+    }
   }
 
   Future<void> loadProduits(String entrepriseId) async {
@@ -62,7 +88,7 @@ class ProduitController extends AsyncNotifier<List<Produit>> {
 
       // Recharger seulement si c'est la même entreprise
       if (_currentEntrepriseId == produit.entrepriseId) {
-        state = await AsyncValue.guard(() => _loadProduits(entrepriseId: produit.entrepriseId));
+        await refreshProduits();
       }
     } catch (e, stack) {
       print('Error adding produit: $e\n$stack');
@@ -100,7 +126,7 @@ class ProduitController extends AsyncNotifier<List<Produit>> {
 
       // Recharger seulement si c'est la même entreprise
       if (_currentEntrepriseId == produit.entrepriseId) {
-        state = await AsyncValue.guard(() => _loadProduits(entrepriseId: produit.entrepriseId));
+        await refreshProduits();
       }
     } catch (e, stack) {
       print('Error updating produit: $e\n$stack');

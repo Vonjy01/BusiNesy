@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dropdown_search/dropdown_search.dart';
+import 'package:project6/controller/etat_commande.dart';
 import 'package:project6/controller/vente_controller.dart';
 import 'package:project6/controller/client_controller.dart';
 import 'package:project6/controller/produit_controller.dart';
@@ -265,151 +266,131 @@ class _VenteDetailPageState extends ConsumerState<VenteDetailPage> {
     );
   }
 
-  Widget _buildModifierProduitDialog(VenteItem item) {
-    final quantiteController = TextEditingController(
-      text: item.quantite.toString(),
-    );
-    final produitRevenuController = TextEditingController(
-      text: item.produitRevenu.toString(),
-    );
-    final prixUnitaireController = TextEditingController(
-      text: item.prixUnitaire.toStringAsFixed(2),
-    );
-    final beneficeController = TextEditingController(
-      text: item.beneficeUnitaire.toStringAsFixed(2),
-    );
-    int selectedEtat = item.etat;
+ Widget _buildModifierProduitDialog(VenteItem item) {
+  final quantiteController = TextEditingController(text: item.quantite.toString());
+  final produitRevenuController = TextEditingController(text: item.produitRevenu.toString());
+  final prixUnitaireController = TextEditingController(text: item.prixUnitaire.toStringAsFixed(2));
+  final beneficeController = TextEditingController(text: item.beneficeUnitaire.toStringAsFixed(2));
+  int selectedEtat = item.etat;
 
-    return AlertDialog(
-      title: const Text('Modifier le produit'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Produit: ${item.produitNom}',
-              style: const TextStyle(fontWeight: FontWeight.bold),
+  return AlertDialog(
+    title: const Text('Modifier le produit'),
+    content: SingleChildScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('Produit: ${item.produitNom}', style: const TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 16),
+          
+          TextFormField(
+            controller: quantiteController,
+            decoration: const InputDecoration(
+              labelText: 'Quantité *',
+              border: OutlineInputBorder(),
             ),
-            const SizedBox(height: 16),
-
+            keyboardType: TextInputType.number,
+          ),
+          const SizedBox(height: 12),
+          
+          TextFormField(
+            controller: prixUnitaireController,
+            decoration: const InputDecoration(
+              labelText: 'Prix unitaire *',
+              border: OutlineInputBorder(),
+            ),
+            keyboardType: TextInputType.number,
+          ),
+          const SizedBox(height: 12),
+          
+          TextFormField(
+            controller: beneficeController,
+            decoration: const InputDecoration(
+              labelText: 'Bénéfice unitaire *',
+              border: OutlineInputBorder(),
+            ),
+            keyboardType: TextInputType.number,
+          ),
+          const SizedBox(height: 12),
+          
+          Consumer(
+            builder: (context, ref, child) {
+              final etatsState = ref.watch(etatCommandeControllerProvider);
+              return etatsState.when(
+                loading: () => const CircularProgressIndicator(),
+                error: (error, stack) => Text('Erreur: $error'),
+                data: (etats) {
+                  return DropdownButtonFormField<int>(
+                    value: selectedEtat,
+                    decoration: const InputDecoration(
+                      labelText: 'État',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: etats.map((etat) {
+                      return DropdownMenuItem(
+                        value: etat.id,
+                        child: Text(etat.libelle),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        selectedEtat = value!;
+                      });
+                    },
+                  );
+                },
+              );
+            },
+          ),
+          const SizedBox(height: 12),
+          
+          if (selectedEtat == 2 || selectedEtat == 3)
             TextFormField(
-              controller: quantiteController,
+              controller: produitRevenuController,
               decoration: const InputDecoration(
-                labelText: 'Quantité *',
+                labelText: 'Produit revenu',
                 border: OutlineInputBorder(),
               ),
               keyboardType: TextInputType.number,
             ),
-            const SizedBox(height: 12),
-
-            TextFormField(
-              controller: prixUnitaireController,
-              decoration: const InputDecoration(
-                labelText: 'Prix unitaire *',
-                border: OutlineInputBorder(),
-              ),
-              keyboardType: TextInputType.number,
-            ),
-            const SizedBox(height: 12),
-
-            TextFormField(
-              controller: beneficeController,
-              decoration: const InputDecoration(
-                labelText: 'Bénéfice unitaire *',
-                border: OutlineInputBorder(),
-              ),
-              keyboardType: TextInputType.number,
-            ),
-            const SizedBox(height: 12),
-
-            Consumer(
-              builder: (context, ref, child) {
-                final etatsState = ref.watch(etatCommandeProvider);
-                return etatsState.when(
-                  loading: () => const CircularProgressIndicator(),
-                  error: (error, stack) => Text('Erreur: $error'),
-                  data: (etats) {
-                    return DropdownButtonFormField<int>(
-                      value: selectedEtat,
-                      decoration: const InputDecoration(
-                        labelText: 'État',
-                        border: OutlineInputBorder(),
-                      ),
-                      items: etats.map((etat) {
-                        return DropdownMenuItem(
-                          value: etat.id,
-                          child: Text(etat.libelle),
-                        );
-                      }).toList(),
-                      onChanged: (value) {
-                        setState(() {
-                          selectedEtat = value!;
-                        });
-                      },
-                    );
-                  },
-                );
-              },
-            ),
-            const SizedBox(height: 12),
-
-            if (selectedEtat == 2 || selectedEtat == 3)
-              TextFormField(
-                controller: produitRevenuController,
-                decoration: const InputDecoration(
-                  labelText: 'Produit revenu',
-                  border: OutlineInputBorder(),
-                ),
-                keyboardType: TextInputType.number,
-              ),
-            if (selectedEtat == 2 || selectedEtat == 3)
-              const SizedBox(height: 12),
-          ],
-        ),
+          if (selectedEtat == 2 || selectedEtat == 3) const SizedBox(height: 12),
+        ],
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Annuler'),
-        ),
-        ElevatedButton(
-          onPressed: () {
-            final nouvelleQuantite =
-                int.tryParse(quantiteController.text) ?? item.quantite;
-            final nouveauProduitRevenu =
-                int.tryParse(produitRevenuController.text) ??
-                item.produitRevenu;
-            final nouveauPrixUnitaire =
-                double.tryParse(prixUnitaireController.text) ??
-                item.prixUnitaire;
-            final nouveauBenefice =
-                double.tryParse(beneficeController.text) ??
-                item.beneficeUnitaire;
-
-            setState(() {
-              final index = _venteItems.indexWhere((i) => i.id == item.id);
-              if (index != -1) {
-                final quantiteNet = nouvelleQuantite - nouveauProduitRevenu;
-
-                _venteItems[index] = item.copyWith(
-                  quantite: nouvelleQuantite,
-                  produitRevenu: nouveauProduitRevenu,
-                  prixUnitaire: nouveauPrixUnitaire,
-                  beneficeUnitaire: nouveauBenefice,
-                  prixTotal: quantiteNet * nouveauPrixUnitaire,
-                  beneficeTotal: quantiteNet * nouveauBenefice,
-                  etat: selectedEtat,
-                );
-              }
-            });
-            Navigator.of(context).pop();
-          },
-          child: const Text('Enregistrer'),
-        ),
-      ],
-    );
-  }
-
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.of(context).pop(),
+        child: const Text('Annuler'),
+      ),
+      ElevatedButton(
+        onPressed: () {
+          final nouvelleQuantite = int.tryParse(quantiteController.text) ?? item.quantite;
+          final nouveauProduitRevenu = int.tryParse(produitRevenuController.text) ?? item.produitRevenu;
+          final nouveauPrixUnitaire = double.tryParse(prixUnitaireController.text) ?? item.prixUnitaire;
+          final nouveauBenefice = double.tryParse(beneficeController.text) ?? item.beneficeUnitaire;
+          
+          setState(() {
+            final index = _venteItems.indexWhere((i) => i.id == item.id);
+            if (index != -1) {
+              final quantiteNet = nouvelleQuantite - nouveauProduitRevenu;
+              
+              _venteItems[index] = item.copyWith(
+                quantite: nouvelleQuantite,
+                produitRevenu: nouveauProduitRevenu,
+                prixUnitaire: nouveauPrixUnitaire,
+                beneficeUnitaire: nouveauBenefice,
+                prixTotal: quantiteNet * nouveauPrixUnitaire,
+                beneficeTotal: quantiteNet * nouveauBenefice,
+                etat: selectedEtat,
+              );
+            }
+          });
+          Navigator.of(context).pop();
+        },
+        child: const Text('Enregistrer'),
+      ),
+    ],
+  );
+}
   Future<void> _supprimerProduit(VenteItem item, BuildContext context) async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -987,95 +968,77 @@ Future<void> _enregistrerVente() async {
       ],
     );
   }
-
-  Widget _buildListeProduits() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Produits ajoutés',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 8),
-
-        ..._venteItems
-            .map(
-              (item) => Card(
-                margin: const EdgeInsets.symmetric(vertical: 4),
-                child: ListTile(
-                  title: Text(item.produitNom),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Quantité: ${item.quantite}'),
-                      if (item.etat == 2 || item.etat == 3)
-                        Text('Revenu: ${item.produitRevenu}'),
-                      Text(
-                        'Prix unitaire: ${item.prixUnitaire.toStringAsFixed(2)} $devise',
-                      ),
-                      Text(
-                        'Bénéfice unitaire: ${item.beneficeUnitaire.toStringAsFixed(2)} $devise',
-                      ),
-                      Text(
-                        'Total: ${item.prixTotal.toStringAsFixed(2)} $devise',
-                      ),
-                      Text(
-                        'Bénéfice total: ${item.beneficeTotal.toStringAsFixed(2)} $devise',
-                      ),
-                      Text('État: ${_getEtatLibelle(item.etat)}'),
-                      // Affichez la session ID pour chaque produit
-                      const SizedBox(height: 4),
-                      Text(
-                        'Session: ${_sessionId.length > 8 ? _sessionId.substring(0, 8) + '...' : _sessionId}',
-                        style: const TextStyle(
-                          fontSize: 10,
-                          color: Colors.grey,
-                          fontFamily: 'monospace',
-                        ),
-                      ),
-                    ],
+Widget _buildListeProduits() {
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      const Text('Produits ajoutés', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+      const SizedBox(height: 8),
+      
+      ..._venteItems.map((item) => FutureBuilder<String>(
+        future: _getEtatLibelle(item.etat),
+        builder: (context, snapshot) {
+          final etatLibelle = snapshot.data ?? 'Chargement...';
+          
+          return Card(
+            margin: const EdgeInsets.symmetric(vertical: 4),
+            child: ListTile(
+              title: Text(item.produitNom),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Quantité: ${item.quantite}'),
+                  if (item.etat == 2 || item.etat == 3) Text('Revenu: ${item.produitRevenu}'),
+                  Text('Prix unitaire: ${item.prixUnitaire.toStringAsFixed(2)} $devise'),
+                  Text('Bénéfice unitaire: ${item.beneficeUnitaire.toStringAsFixed(2)} $devise'),
+                  Text('Total: ${item.prixTotal.toStringAsFixed(2)} $devise'),
+                  Text('Bénéfice total: ${item.beneficeTotal.toStringAsFixed(2)} $devise'),
+                  Text('État: $etatLibelle'), // Utilisez le libellé de la base
+                  const SizedBox(height: 4),
+                  Text(
+                    'Session: ${_sessionId.length > 8 ? _sessionId.substring(0, 8) + '...' : _sessionId}',
+                    style: const TextStyle(fontSize: 10, color: Colors.grey, fontFamily: 'monospace'),
                   ),
-                  trailing: PopupMenuButton<String>(
-                    itemBuilder: (BuildContext context) => [
-                      const PopupMenuItem(
-                        value: 'modifier',
-                        child: Text('Modifier'),
-                      ),
-                      const PopupMenuItem(
-                        value: 'supprimer',
-                        child: Text('Supprimer'),
-                      ),
-                    ],
-                    onSelected: (String value) {
-                      if (value == 'modifier') {
-                        _modifierProduit(item);
-                      } else if (value == 'supprimer') {
-                        _supprimerProduit(item, context);
-                      }
-                    },
-                  ),
-                ),
+                ],
               ),
-            )
-            .toList(),
-      ],
-    );
-  }
+              trailing: PopupMenuButton<String>(
+                itemBuilder: (BuildContext context) => [
+                  const PopupMenuItem(
+                    value: 'modifier',
+                    child: Text('Modifier'),
+                  ),
+                  const PopupMenuItem(
+                    value: 'supprimer',
+                    child: Text('Supprimer'),
+                  ),
+                ],
+                onSelected: (String value) {
+                  if (value == 'modifier') {
+                    _modifierProduit(item);
+                  } else if (value == 'supprimer') {
+                    _supprimerProduit(item, context);
+                  }
+                },
+              ),
+            ),
+          );
+        },
+      )).toList(),
+    ],
+  );
+}
 
-  String _getEtatLibelle(int etatId) {
-    switch (etatId) {
-      case 1:
-        return 'En attente';
-      case 2:
-        return 'Validé';
-      case 3:
-        return 'Incomplet';
-      case 4:
-        return 'Annulé';
-      default:
-        return 'Inconnu';
-    }
+// Dans _VenteDetailPageState
+Future<String> _getEtatLibelle(int etatId) async {
+  try {
+    final etatCommandeController = ref.read(etatCommandeControllerProvider.notifier);
+    final etat = await etatCommandeController.getEtatById(etatId);
+    return etat?.libelle ?? 'Inconnu';
+  } catch (e) {
+    print('Erreur lors de la récupération de l\'état: $e');
+    return 'Inconnu';
   }
+}
 
   Widget _buildSectionTotaux() {
     return Card(

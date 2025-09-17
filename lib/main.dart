@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:project6/controller/auth_controller.dart';
 import 'package:project6/controller/entreprise_controller.dart';
+import 'package:project6/controller/etat_commande.dart';
 import 'package:project6/page/auth/login_page.dart';
 import 'package:project6/page/entreprise/entreprise_selection.dart';
 import 'package:project6/services/database_helper.dart';
@@ -16,7 +17,8 @@ void main() async {
       statusBarIconBrightness: Brightness.light,
     ),
   );
-  
+    final container = ProviderContainer();
+  await container.read(etatCommandeControllerProvider.future);
   // Initialisation de la base de données
   await DatabaseHelper.instance.database;
   await DatabaseHelper.instance.debugDatabase();
