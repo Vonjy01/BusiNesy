@@ -15,12 +15,14 @@ import 'package:project6/provider/etat_commande_provider.dart';
 import 'package:project6/widget/Header.dart';
 import 'package:project6/utils/constant.dart';
 import 'package:uuid/uuid.dart';
+import 'package:flutter/services.dart';
 
 class VenteDetailPage extends ConsumerStatefulWidget {
   final List<Vente>? ventes;
   final Client? client;
   final String userId;
   final String entrepriseId;
+  final String? sessionId;
 
   const VenteDetailPage({
     Key? key,
@@ -28,6 +30,7 @@ class VenteDetailPage extends ConsumerStatefulWidget {
     this.client,
     required this.userId,
     required this.entrepriseId,
+    this.sessionId,
   }) : super(key: key);
 
   @override
@@ -42,7 +45,7 @@ class _VenteDetailPageState extends ConsumerState<VenteDetailPage> {
   DateTime _dateVente = DateTime.now();
   double _montantPaye = 0;
   String _description = '';
-
+  String _sessionId = '';
   List<Produit> _produits = [];
   List<CategorieProduit> _categories = [];
   List<VenteItem> _venteItems = [];
@@ -51,67 +54,96 @@ class _VenteDetailPageState extends ConsumerState<VenteDetailPage> {
   int? _currentCategorieId;
   int _currentQuantite = 1;
   int _currentProduitRevenu = 0;
-  int _currentEtat = 1; // État par défaut = 1 (En attente)
+  int _currentEtat = 1;
 
   final TextEditingController _quantiteController = TextEditingController();
-  final TextEditingController _produitRevenuController = TextEditingController();
-
+  final TextEditingController _produitRevenuController =
+      TextEditingController();
   @override
   void initState() {
     super.initState();
-    
+
     _quantiteController.text = '1';
     _produitRevenuController.text = '0';
-    
-    // Si on modifie une vente existante
+
+    // INITIALISEZ LA SESSION UNE SEULE FOIS
+    if (_sessionId.isEmpty) {
+      if (widget.ventes != null && widget.ventes!.isNotEmpty) {
+        _sessionId = widget.ventes!.first.sessionId;
+        print('Session ID des ventes existantes: $_sessionId');
+      } else if (widget.sessionId != null && widget.sessionId!.isNotEmpty) {
+        _sessionId = widget.sessionId!;
+        print('Session ID reçu: $_sessionId');
+      } else {
+        _sessionId = _uuid.v4();
+        print('Nouvelle Session ID générée: $_sessionId');
+      }
+    } else {
+      print('Session ID déjà existant conservé: $_sessionId');
+    }
+
     if (widget.ventes != null && widget.ventes!.isNotEmpty) {
       final firstVente = widget.ventes!.first;
       _selectedClient = widget.client;
       _dateVente = firstVente.dateVente;
       _montantPaye = firstVente.montantPaye;
       _description = firstVente.description ?? '';
-      
-      // Charger les produits de la vente avec leurs noms
-      _loadVentesWithProductNames();
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _loadVentesWithProductNames();
+        }
+      });
     } else if (widget.client != null) {
-      // Si on ouvre directement avec un client (depuis la liste)
       _selectedClient = widget.client;
     }
   }
 
-  // Charger les ventes avec les noms des produits
   Future<void> _loadVentesWithProductNames() async {
+    // Utilisez ref.read ici, pas dans initState
     final produitsState = ref.read(produitControllerProvider);
-    
+
     produitsState.when(
       data: (produits) {
-        setState(() {
-          for (final vente in widget.ventes!) {
-            final produit = produits.firstWhere(
-              (p) => p.id == vente.produitId,
-              orElse: () => Produit(
-                id: '', nom: 'Produit inconnu', stock: 0, prixVente: 0, prixAchat: 0,
-                defectueux: 0, entrepriseId: '', createdAt: DateTime.now(),
-                categorieId: null, benefice: 0, seuilAlerte: 5,
-              ),
-            );
-            
-            final quantiteNet = vente.quantite - vente.produitRevenu;
-            
-            _venteItems.add(VenteItem(
-              id: vente.id,
-              produitId: vente.produitId,
-              produitNom: produit.nom,
-              quantite: vente.quantite,
-              produitRevenu: vente.produitRevenu,
-              prixUnitaire: vente.prixUnitaire,
-              beneficeUnitaire: produit.benefice ?? 0,
-              prixTotal: vente.prixTotal,
-              beneficeTotal: quantiteNet * (produit.benefice ?? 0),
-              etat: vente.etat,
-            ));
-          }
-        });
+        if (mounted) {
+          setState(() {
+            for (final vente in widget.ventes!) {
+              final produit = produits.firstWhere(
+                (p) => p.id == vente.produitId,
+                orElse: () => Produit(
+                  id: '',
+                  nom: 'Produit inconnu',
+                  stock: 0,
+                  prixVente: 0,
+                  prixAchat: 0,
+                  defectueux: 0,
+                  entrepriseId: '',
+                  createdAt: DateTime.now(),
+                  categorieId: null,
+                  benefice: 0,
+                  seuilAlerte: 5,
+                ),
+              );
+
+              final quantiteNet = vente.quantite - vente.produitRevenu;
+
+              _venteItems.add(
+                VenteItem(
+                  id: vente.id,
+                  produitId: vente.produitId,
+                  produitNom: produit.nom,
+                  quantite: vente.quantite,
+                  produitRevenu: vente.produitRevenu,
+                  prixUnitaire: vente.prixUnitaire,
+                  beneficeUnitaire: produit.benefice ?? 0,
+                  prixTotal: vente.prixTotal,
+                  beneficeTotal: quantiteNet * (produit.benefice ?? 0),
+                  etat: vente.etat,
+                ),
+              );
+            }
+          });
+        }
       },
       loading: () {},
       error: (error, stack) {},
@@ -148,20 +180,43 @@ class _VenteDetailPageState extends ConsumerState<VenteDetailPage> {
       return;
     }
 
-    // Vérifier si le produit existe déjà dans la commande
-    if (_venteItems.any((item) => item.produitId == _currentProduitId)) {
+    final existingItem = _venteItems.firstWhere(
+      (item) =>
+          item.produitId == _currentProduitId && item.etat == _currentEtat,
+      orElse: () => VenteItem(
+        id: '',
+        produitId: '',
+        produitNom: '',
+        quantite: 0,
+        produitRevenu: 0,
+        prixUnitaire: 0,
+        beneficeUnitaire: 0,
+        prixTotal: 0,
+        beneficeTotal: 0,
+        etat: 0,
+      ),
+    );
+
+    if (existingItem.produitId.isNotEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ce produit existe déjà dans la commande, veuillez vérifier')),
+        const SnackBar(
+          content: Text(
+            'Ce produit existe déjà dans la commande avec le même état',
+          ),
+        ),
       );
       return;
     }
 
     final produit = _produits.firstWhere((p) => p.id == _currentProduitId);
-    
-    // Vérifier le stock seulement si l'état n'est pas "revenu"
-    if (_currentEtat != 2 && _currentEtat != 3 && _currentQuantite > produit.stock) {
+
+    if (_currentEtat != 2 &&
+        _currentEtat != 3 &&
+        _currentQuantite > produit.stock) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Stock insuffisant. Disponible: ${produit.stock}')),
+        SnackBar(
+          content: Text('Stock insuffisant. Disponible: ${produit.stock}'),
+        ),
       );
       return;
     }
@@ -186,7 +241,7 @@ class _VenteDetailPageState extends ConsumerState<VenteDetailPage> {
       _venteItems.add(newItem);
       _resetProduitFields();
     });
-    
+
     Navigator.of(context).pop();
   }
 
@@ -197,7 +252,7 @@ class _VenteDetailPageState extends ConsumerState<VenteDetailPage> {
       _currentQuantite = 1;
       _currentProduitRevenu = 0;
       _currentEtat = 1;
-      
+
       _quantiteController.text = '1';
       _produitRevenuController.text = '0';
     });
@@ -211,10 +266,18 @@ class _VenteDetailPageState extends ConsumerState<VenteDetailPage> {
   }
 
   Widget _buildModifierProduitDialog(VenteItem item) {
-    final quantiteController = TextEditingController(text: item.quantite.toString());
-    final produitRevenuController = TextEditingController(text: item.produitRevenu.toString());
-    final prixUnitaireController = TextEditingController(text: item.prixUnitaire.toStringAsFixed(2));
-    final beneficeController = TextEditingController(text: item.beneficeUnitaire.toStringAsFixed(2));
+    final quantiteController = TextEditingController(
+      text: item.quantite.toString(),
+    );
+    final produitRevenuController = TextEditingController(
+      text: item.produitRevenu.toString(),
+    );
+    final prixUnitaireController = TextEditingController(
+      text: item.prixUnitaire.toStringAsFixed(2),
+    );
+    final beneficeController = TextEditingController(
+      text: item.beneficeUnitaire.toStringAsFixed(2),
+    );
     int selectedEtat = item.etat;
 
     return AlertDialog(
@@ -223,9 +286,12 @@ class _VenteDetailPageState extends ConsumerState<VenteDetailPage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('Produit: ${item.produitNom}', style: const TextStyle(fontWeight: FontWeight.bold)),
+            Text(
+              'Produit: ${item.produitNom}',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 16),
-            
+
             TextFormField(
               controller: quantiteController,
               decoration: const InputDecoration(
@@ -235,7 +301,7 @@ class _VenteDetailPageState extends ConsumerState<VenteDetailPage> {
               keyboardType: TextInputType.number,
             ),
             const SizedBox(height: 12),
-            
+
             TextFormField(
               controller: prixUnitaireController,
               decoration: const InputDecoration(
@@ -245,7 +311,7 @@ class _VenteDetailPageState extends ConsumerState<VenteDetailPage> {
               keyboardType: TextInputType.number,
             ),
             const SizedBox(height: 12),
-            
+
             TextFormField(
               controller: beneficeController,
               decoration: const InputDecoration(
@@ -255,8 +321,7 @@ class _VenteDetailPageState extends ConsumerState<VenteDetailPage> {
               keyboardType: TextInputType.number,
             ),
             const SizedBox(height: 12),
-            
-            // État depuis la table etat_commande
+
             Consumer(
               builder: (context, ref, child) {
                 final etatsState = ref.watch(etatCommandeProvider);
@@ -287,7 +352,7 @@ class _VenteDetailPageState extends ConsumerState<VenteDetailPage> {
               },
             ),
             const SizedBox(height: 12),
-            
+
             if (selectedEtat == 2 || selectedEtat == 3)
               TextFormField(
                 controller: produitRevenuController,
@@ -297,7 +362,8 @@ class _VenteDetailPageState extends ConsumerState<VenteDetailPage> {
                 ),
                 keyboardType: TextInputType.number,
               ),
-            if (selectedEtat == 2 || selectedEtat == 3) const SizedBox(height: 12),
+            if (selectedEtat == 2 || selectedEtat == 3)
+              const SizedBox(height: 12),
           ],
         ),
       ),
@@ -308,16 +374,23 @@ class _VenteDetailPageState extends ConsumerState<VenteDetailPage> {
         ),
         ElevatedButton(
           onPressed: () {
-            final nouvelleQuantite = int.tryParse(quantiteController.text) ?? item.quantite;
-            final nouveauProduitRevenu = int.tryParse(produitRevenuController.text) ?? item.produitRevenu;
-            final nouveauPrixUnitaire = double.tryParse(prixUnitaireController.text) ?? item.prixUnitaire;
-            final nouveauBenefice = double.tryParse(beneficeController.text) ?? item.beneficeUnitaire;
-            
+            final nouvelleQuantite =
+                int.tryParse(quantiteController.text) ?? item.quantite;
+            final nouveauProduitRevenu =
+                int.tryParse(produitRevenuController.text) ??
+                item.produitRevenu;
+            final nouveauPrixUnitaire =
+                double.tryParse(prixUnitaireController.text) ??
+                item.prixUnitaire;
+            final nouveauBenefice =
+                double.tryParse(beneficeController.text) ??
+                item.beneficeUnitaire;
+
             setState(() {
               final index = _venteItems.indexWhere((i) => i.id == item.id);
               if (index != -1) {
                 final quantiteNet = nouvelleQuantite - nouveauProduitRevenu;
-                
+
                 _venteItems[index] = item.copyWith(
                   quantite: nouvelleQuantite,
                   produitRevenu: nouveauProduitRevenu,
@@ -338,39 +411,44 @@ class _VenteDetailPageState extends ConsumerState<VenteDetailPage> {
   }
 
   Future<void> _supprimerProduit(VenteItem item, BuildContext context) async {
-    if (item.etat == 2 || item.etat == 3) {
-      final choix = await showDialog<String>(
-        context: context,
-        builder: (BuildContext context) {
-          return AlertDialog(
-            title: const Text('Options de suppression'),
-            content: const Text('Cette vente a déjà été traitée. Que souhaitez-vous faire ?'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop('restaurer'),
-                child: const Text('Restaurer le stock'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.of(context).pop('annuler'),
-                child: const Text('Annuler la suppression'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.of(context).pop('supprimer'),
-                child: const Text('Supprimer sans restaurer'),
-              ),
-            ],
-          );
-        },
-      );
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirmer la suppression'),
+        content: const Text(
+          'Êtes-vous sûr de vouloir supprimer ce produit de la vente ?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Supprimer'),
+          ),
+        ],
+      ),
+    );
 
-      if (choix == 'annuler') {
-        return;
+    if (confirm == true) {
+      try {
+        final venteController = ref.read(venteControllerProvider.notifier);
+        await venteController.deleteVente(item.id, widget.userId);
+
+        setState(() {
+          _venteItems.removeWhere((i) => i.id == item.id);
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Produit supprimé avec succès')),
+        );
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur lors de la suppression: $e')),
+        );
       }
     }
-
-    setState(() {
-      _venteItems.removeWhere((i) => i.id == item.id);
-    });
   }
 
   void _showAjouterProduitDialog() {
@@ -386,10 +464,10 @@ class _VenteDetailPageState extends ConsumerState<VenteDetailPage> {
         final categoriesState = ref.watch(categorieProduitControllerProvider);
         final produitsState = ref.watch(produitControllerProvider);
         final etatsState = ref.watch(etatCommandeProvider);
-        
+
         int? selectedCategorieId = _currentCategorieId;
         CategorieProduit? selectedCategorie;
-        
+
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
@@ -411,7 +489,7 @@ class _VenteDetailPageState extends ConsumerState<VenteDetailPage> {
                             selectedCategorie = null;
                           }
                         }
-                        
+
                         return DropdownSearch<CategorieProduit>(
                           items: categories,
                           selectedItem: selectedCategorie,
@@ -429,44 +507,7 @@ class _VenteDetailPageState extends ConsumerState<VenteDetailPage> {
                           },
                           dropdownDecoratorProps: const DropDownDecoratorProps(
                             dropdownSearchDecoration: InputDecoration(
-                              labelText: 'Catégorie',
-                              border: OutlineInputBorder(),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    
-                    produitsState.when(
-                      loading: () => const CircularProgressIndicator(),
-                      error: (error, stack) => Text('Erreur: $error'),
-                      data: (produits) {
-                        _produits = produits;
-                        List<Produit> produitsFiltres = selectedCategorieId == null 
-                            ? produits
-                            : produits.where((p) => p.categorieId == selectedCategorieId).toList();
-                        
-                        return DropdownSearch<Produit>(
-                          items: produitsFiltres,
-                          selectedItem: null,
-                          itemAsString: (Produit p) => '${p.nom} (Stock: ${p.stock}, Prix: ${p.prixVente} $devise)',
-                          popupProps: PopupProps.menu(
-                            showSearchBox: true,
-                            searchDelay: const Duration(milliseconds: 300),
-                            emptyBuilder: (context, searchEntry) {
-                              return ListTile(
-                                title: const Text('Aucun produit trouvé'),
-                                subtitle: selectedCategorieId == null
-                                    ? const Text('Tous les produits sont affichés')
-                                    : const Text('Aucun produit dans cette catégorie'),
-                              );
-                            },
-                          ),
-                          onChanged: _onProduitChanged,
-                          dropdownDecoratorProps: const DropDownDecoratorProps(
-                            dropdownSearchDecoration: InputDecoration(
-                              labelText: 'Produit *',
+                              labelText: 'Catégorie *',
                               border: OutlineInputBorder(),
                             ),
                           ),
@@ -475,7 +516,61 @@ class _VenteDetailPageState extends ConsumerState<VenteDetailPage> {
                     ),
                     const SizedBox(height: 12),
 
-                    // État depuis la table etat_commande
+                    if (selectedCategorieId != null)
+                      produitsState.when(
+                        loading: () => const CircularProgressIndicator(),
+                        error: (error, stack) => Text('Erreur: $error'),
+                        data: (produits) {
+                          _produits = produits;
+                          List<Produit> produitsFiltres = produits
+                              .where(
+                                (p) => p.categorieId == selectedCategorieId,
+                              )
+                              .toList();
+
+                          return DropdownSearch<Produit>(
+                            items: produitsFiltres,
+                            selectedItem: null,
+                            itemAsString: (Produit p) =>
+                                '${p.nom} (Stock: ${p.stock}, Prix: ${p.prixVente} $devise)',
+                            popupProps: PopupProps.menu(
+                              showSearchBox: true,
+                              searchDelay: const Duration(milliseconds: 300),
+                              emptyBuilder: (context, searchEntry) {
+                                return const ListTile(
+                                  title: Text('Aucun produit trouvé'),
+                                  subtitle: Text(
+                                    'Aucun produit dans cette catégorie',
+                                  ),
+                                );
+                              },
+                            ),
+                            onChanged: _onProduitChanged,
+                            dropdownDecoratorProps:
+                                const DropDownDecoratorProps(
+                                  dropdownSearchDecoration: InputDecoration(
+                                    labelText: 'Produit *',
+                                    border: OutlineInputBorder(),
+                                  ),
+                                ),
+                          );
+                        },
+                      ),
+
+                    if (selectedCategorieId == null)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 16.0),
+                        child: Text(
+                          'Veuillez d\'abord sélectionner une catégorie',
+                          style: TextStyle(
+                            color: Colors.grey,
+                            fontStyle: FontStyle.italic,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    const SizedBox(height: 12),
+
                     etatsState.when(
                       loading: () => const CircularProgressIndicator(),
                       error: (error, stack) => Text('Erreur: $error'),
@@ -508,18 +603,26 @@ class _VenteDetailPageState extends ConsumerState<VenteDetailPage> {
                     ),
                     const SizedBox(height: 12),
 
-                    if (_currentProduitId != null) 
+                    if (_currentProduitId != null)
                       produitsState.when(
                         data: (produits) {
                           final produit = produits.firstWhere(
                             (p) => p.id == _currentProduitId,
                             orElse: () => Produit(
-                              id: '', nom: '', stock: 0, prixVente: 0, prixAchat: 0,
-                              defectueux: 0, entrepriseId: '', createdAt: DateTime.now(),
-                              categorieId: null, benefice: 0, seuilAlerte: 5,
+                              id: '',
+                              nom: '',
+                              stock: 0,
+                              prixVente: 0,
+                              prixAchat: 0,
+                              defectueux: 0,
+                              entrepriseId: '',
+                              createdAt: DateTime.now(),
+                              categorieId: null,
+                              benefice: 0,
+                              seuilAlerte: 5,
                             ),
                           );
-                          
+
                           return Column(
                             children: [
                               Row(
@@ -527,13 +630,18 @@ class _VenteDetailPageState extends ConsumerState<VenteDetailPage> {
                                   Expanded(
                                     child: Text(
                                       'Prix: ${produit.prixVente} $devise',
-                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                                   ),
                                   Expanded(
                                     child: Text(
                                       'Bénéfice: ${produit.benefice ?? 0} $devise',
-                                      style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green),
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.green,
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -542,7 +650,9 @@ class _VenteDetailPageState extends ConsumerState<VenteDetailPage> {
                               Text(
                                 'Stock disponible: ${produit.stock}',
                                 style: TextStyle(
-                                  color: produit.stock < 5 ? Colors.red : Colors.green,
+                                  color: produit.stock < 5
+                                      ? Colors.red
+                                      : Colors.green,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
@@ -583,7 +693,8 @@ class _VenteDetailPageState extends ConsumerState<VenteDetailPage> {
                             keyboardType: TextInputType.number,
                             onChanged: (value) {
                               setState(() {
-                                _currentProduitRevenu = int.tryParse(value) ?? 0;
+                                _currentProduitRevenu =
+                                    int.tryParse(value) ?? 0;
                               });
                             },
                             enabled: _currentEtat == 2 || _currentEtat == 3,
@@ -618,93 +729,78 @@ class _VenteDetailPageState extends ConsumerState<VenteDetailPage> {
   double get _beneficeTotal {
     return _venteItems.fold(0, (sum, item) => sum + item.beneficeTotal);
   }
+Future<void> _enregistrerVente() async {
+  if (_formKey.currentState!.validate()) {
+    if (_selectedClient == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Veuillez sélectionner un client')),
+      );
+      return;
+    }
 
-  Future<void> _enregistrerVente() async {
-    if (_formKey.currentState!.validate()) {
-      // Vérifier le client selon le contexte
-      final Client? client;
-      if (widget.client != null) {
-        client = widget.client;
-      } else if (_selectedClient != null) {
-        client = _selectedClient;
+    if (_venteItems.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Veuillez ajouter au moins un produit')),
+      );
+      return;
+    }
+
+    print('Sauvegarde avec session ID: $_sessionId');
+
+    final venteController = ref.read(venteControllerProvider.notifier);
+    final List<Vente> ventes = [];
+    final DateTime dateVente = DateTime.now();
+
+    for (final item in _venteItems) {
+      final vente = Vente(
+        id: item.id,
+        produitId: item.produitId,
+        quantite: item.quantite,
+        produitRevenu: item.produitRevenu,
+        description: _description,
+        prixTotal: item.prixTotal,
+        prixUnitaire: item.prixUnitaire,
+        etat: item.etat,
+        benefice: item.beneficeTotal,
+        montantPaye: _montantPaye,
+        dateVente: dateVente,
+        clientId: _selectedClient!.id,
+        userId: widget.userId,
+        entrepriseId: widget.entrepriseId,
+        sessionId: _sessionId,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+      ventes.add(vente);
+      print('Vente créée - Session: ${vente.sessionId}, Produit: ${vente.produitId}');
+    }
+
+    try {
+      if (widget.ventes == null) {
+        await venteController.addVentesBatch(ventes, widget.userId);
       } else {
+        await venteController.deleteVentesBySession(_sessionId, widget.userId);
+        await venteController.addVentesBatch(ventes, widget.userId);
+      }
+      
+      if (mounted) {
+        // NE RECONSTRUISEZ PAS LA PAGE - juste retournez en arrière
+        Navigator.of(context).pop(true);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Veuillez sélectionner un client')),
+          const SnackBar(content: Text('Vente enregistrée avec succès')),
         );
-        return;
       }
-
-      if (_venteItems.isEmpty) {
+    } catch (e) {
+      print('Erreur lors de la sauvegarde: $e');
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Veuillez ajouter au moins un produit')),
+          SnackBar(content: Text('Erreur: $e')),
         );
-        return;
-      }
-
-      final venteController = ref.read(venteControllerProvider.notifier);
-      final List<Vente> ventes = [];
-
-      // Déterminer la date de vente
-      final DateTime dateVente;
-      if (widget.ventes != null && widget.ventes!.isNotEmpty) {
-        dateVente = widget.ventes!.first.dateVente;
-      } else {
-        dateVente = DateTime.now();
-      }
-
-      for (final item in _venteItems) {
-        final vente = Vente(
-          id: widget.ventes != null ? item.id : _uuid.v4(),
-          produitId: item.produitId,
-          quantite: item.quantite,
-          produitRevenu: item.produitRevenu,
-          description: _description,
-          prixTotal: item.prixTotal,
-          prixUnitaire: item.prixUnitaire,
-          etat: item.etat,
-          benefice: item.beneficeTotal,
-          montantPaye: _montantPaye / _venteItems.length,
-          dateVente: dateVente,
-          clientId: client!.id,
-          userId: widget.userId,
-          entrepriseId: widget.entrepriseId,
-          createdAt: widget.ventes != null ? DateTime.now() : DateTime.now(),
-          updatedAt: DateTime.now(),
-        );
-        ventes.add(vente);
-      }
-
-      try {
-        if (widget.ventes == null) {
-          for (final vente in ventes) {
-            await venteController.addVente(vente, widget.userId);
-          }
-        } else {
-          for (final vente in widget.ventes!) {
-            await venteController.deleteVente(vente.id, widget.userId);
-          }
-          for (final vente in ventes) {
-            await venteController.addVente(vente, widget.userId);
-          }
-        }
-        
-        if (mounted) {
-          Navigator.of(context).pop();
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Vente enregistrée avec succès')),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Erreur: $e')),
-          );
-        }
       }
     }
   }
+}
 
-  @override
   Widget build(BuildContext context) {
     final clientsState = ref.watch(clientControllerProvider);
 
@@ -721,31 +817,22 @@ class _VenteDetailPageState extends ConsumerState<VenteDetailPage> {
             content: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (widget.client != null)
-                  Text(
-                    'Client: ${widget.client!.nom}',
-                    style: const TextStyle(color: Colors.white, fontSize: 16),
-                  ),
-                if (_selectedClient != null && widget.client == null)
+                if (_selectedClient != null)
                   Text(
                     'Client: ${_selectedClient!.nom}',
                     style: const TextStyle(color: Colors.white, fontSize: 16),
                   ),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'T : ${_totalGeneral.toStringAsFixed(0)} $devise',
-                      style: const TextStyle(color: Colors.white, fontSize: 15),
-                    ),
-                    Text(
-                  'B : ${_beneficeTotal.toStringAsFixed(0)} $devise',
-                  style: const TextStyle(color: Colors.white, fontSize:15 ),
+                const SizedBox(
+                  height: 4,
+                ), // Réduisez l'espace pour éviter l'overflow
+                Text(
+                  'Total: ${_totalGeneral.toStringAsFixed(2)} $devise',
+                  style: const TextStyle(color: Colors.white, fontSize: 14),
                 ),
-                  ],
+                Text(
+                  'Bénéfice: ${_beneficeTotal.toStringAsFixed(2)} $devise',
+                  style: const TextStyle(color: Colors.white, fontSize: 14),
                 ),
-                
               ],
             ),
             actions: [
@@ -762,20 +849,27 @@ class _VenteDetailPageState extends ConsumerState<VenteDetailPage> {
                 key: _formKey,
                 child: ListView(
                   children: [
-                    if (widget.ventes == null && widget.client == null) ...[
+                    if (widget.ventes == null) ...[
                       _buildInformationsGenerales(clientsState),
                       const SizedBox(height: 20),
                     ],
 
                     if (_venteItems.isNotEmpty) _buildListeProduits(),
-                    if (_venteItems.isEmpty) 
+                    if (_venteItems.isEmpty)
                       const Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.shopping_cart, size: 48, color: Colors.grey),
+                            Icon(
+                              Icons.shopping_cart,
+                              size: 48,
+                              color: Colors.grey,
+                            ),
                             SizedBox(height: 16),
-                            Text('Aucun produit ajouté', style: TextStyle(color: Colors.grey)),
+                            Text(
+                              'Aucun produit ajouté',
+                              style: TextStyle(color: Colors.grey),
+                            ),
                           ],
                         ),
                       ),
@@ -801,9 +895,51 @@ class _VenteDetailPageState extends ConsumerState<VenteDetailPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Informations générales', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        const Text(
+          'Informations générales',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        ),
         const SizedBox(height: 12),
-        
+
+        // Affichez la session ID
+        Card(
+          color: Colors.blue[50],
+          child: Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Row(
+              children: [
+                const Icon(Icons.receipt, size: 16, color: Colors.blue),
+                const SizedBox(width: 8),
+                const Text(
+                  'Session ID:',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _sessionId,
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 12,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.content_copy, size: 16),
+                  onPressed: () {
+                    Clipboard.setData(ClipboardData(text: _sessionId));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Session ID copié')),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+
         clientsState.when(
           loading: () => const CircularProgressIndicator(),
           error: (error, stack) => Text('Erreur: $error'),
@@ -844,7 +980,7 @@ class _VenteDetailPageState extends ConsumerState<VenteDetailPage> {
           decoration: const InputDecoration(
             labelText: 'Description',
             border: OutlineInputBorder(),
-            ),
+          ),
           onChanged: (value) => setState(() => _description = value),
           maxLines: 2,
         ),
@@ -856,63 +992,89 @@ class _VenteDetailPageState extends ConsumerState<VenteDetailPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Produits ajoutés', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        const Text(
+          'Produits ajoutés',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        ),
         const SizedBox(height: 8),
-        
-        ..._venteItems.map((item) => Card(
-          margin: const EdgeInsets.symmetric(vertical: 4),
-          child: ListTile(
-            title: Text(item.produitNom),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Quantité: ${item.quantite}'),
-                if (item.etat == 2 || item.etat == 3) Text('Revenu: ${item.produitRevenu}'),
-                Text('Prix unitaire: ${item.prixUnitaire.toStringAsFixed(2)} $devise'),
-                Text('Bénéfice unitaire: ${item.beneficeUnitaire.toStringAsFixed(2)} $devise'),
-                Text('Total: ${item.prixTotal.toStringAsFixed(2)} $devise'),
-                Text('Bénéfice total: ${item.beneficeTotal.toStringAsFixed(2)} $devise'),
-                Consumer(
-                  builder: (context, ref, child) {
-                    final etatsState = ref.watch(etatCommandeProvider);
-                    return etatsState.when(
-                      loading: () => const Text('État: Chargement...'),
-                      error: (error, stack) => Text('État: Erreur'),
-                      data: (etats) {
-                        final etat = etats.firstWhere(
-                          (e) => e.id == item.etat,
-                          orElse: () => EtatCommande(id: 0, libelle: 'Inconnu'),
-                        );
-                        return Text('État: ${etat.libelle}');
-                      },
-                    );
-                  },
+
+        ..._venteItems
+            .map(
+              (item) => Card(
+                margin: const EdgeInsets.symmetric(vertical: 4),
+                child: ListTile(
+                  title: Text(item.produitNom),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Quantité: ${item.quantite}'),
+                      if (item.etat == 2 || item.etat == 3)
+                        Text('Revenu: ${item.produitRevenu}'),
+                      Text(
+                        'Prix unitaire: ${item.prixUnitaire.toStringAsFixed(2)} $devise',
+                      ),
+                      Text(
+                        'Bénéfice unitaire: ${item.beneficeUnitaire.toStringAsFixed(2)} $devise',
+                      ),
+                      Text(
+                        'Total: ${item.prixTotal.toStringAsFixed(2)} $devise',
+                      ),
+                      Text(
+                        'Bénéfice total: ${item.beneficeTotal.toStringAsFixed(2)} $devise',
+                      ),
+                      Text('État: ${_getEtatLibelle(item.etat)}'),
+                      // Affichez la session ID pour chaque produit
+                      const SizedBox(height: 4),
+                      Text(
+                        'Session: ${_sessionId.length > 8 ? _sessionId.substring(0, 8) + '...' : _sessionId}',
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: Colors.grey,
+                          fontFamily: 'monospace',
+                        ),
+                      ),
+                    ],
+                  ),
+                  trailing: PopupMenuButton<String>(
+                    itemBuilder: (BuildContext context) => [
+                      const PopupMenuItem(
+                        value: 'modifier',
+                        child: Text('Modifier'),
+                      ),
+                      const PopupMenuItem(
+                        value: 'supprimer',
+                        child: Text('Supprimer'),
+                      ),
+                    ],
+                    onSelected: (String value) {
+                      if (value == 'modifier') {
+                        _modifierProduit(item);
+                      } else if (value == 'supprimer') {
+                        _supprimerProduit(item, context);
+                      }
+                    },
+                  ),
                 ),
-              ],
-            ),
-            trailing: PopupMenuButton<String>(
-              itemBuilder: (BuildContext context) => [
-                const PopupMenuItem(
-                  value: 'modifier',
-                  child: Text('Modifier'),
-                ),
-                const PopupMenuItem(
-                  value: 'supprimer',
-                  child: Text('Supprimer'),
-                ),
-              ],
-              onSelected: (String value) {
-                if (value == 'modifier') {
-                  _modifierProduit(item);
-                } else if (value == 'supprimer') {
-                  _supprimerProduit(item, context);
-                }
-              },
-            ),
-          ),
-        )).toList(),
+              ),
+            )
+            .toList(),
       ],
     );
+  }
+
+  String _getEtatLibelle(int etatId) {
+    switch (etatId) {
+      case 1:
+        return 'En attente';
+      case 2:
+        return 'Validé';
+      case 3:
+        return 'Incomplet';
+      case 4:
+        return 'Annulé';
+      default:
+        return 'Inconnu';
+    }
   }
 
   Widget _buildSectionTotaux() {
@@ -924,16 +1086,31 @@ class _VenteDetailPageState extends ConsumerState<VenteDetailPage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Total général:', style: TextStyle(fontWeight: FontWeight.bold)),
-                Text('${_totalGeneral.toStringAsFixed(2)} $devise', style: const TextStyle(fontWeight: FontWeight.bold)),
+                const Text(
+                  'Total général:',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  '${_totalGeneral.toStringAsFixed(2)} $devise',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
               ],
             ),
             const SizedBox(height: 8),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Bénéfice total:', style: TextStyle(fontWeight: FontWeight.bold)),
-                Text('${_beneficeTotal.toStringAsFixed(2)} $devise', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green)),
+                const Text(
+                  'Bénéfice total:',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  '${_beneficeTotal.toStringAsFixed(2)} $devise',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.green,
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 8),
@@ -941,7 +1118,30 @@ class _VenteDetailPageState extends ConsumerState<VenteDetailPage> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text('Nombre de produits:'),
-                Text('${_venteItems.length}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                Text(
+                  '${_venteItems.length}',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            // Affichez la session ID dans les totaux
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Session ID:'),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _sessionId,
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontFamily: 'monospace',
+                      color: Colors.grey,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
               ],
             ),
           ],
@@ -963,16 +1163,16 @@ class _VenteDetailPageState extends ConsumerState<VenteDetailPage> {
         if (value == null || value.isEmpty || double.tryParse(value) == null) {
           return 'Montant invalide';
         }
-        
+
         final montant = double.parse(value);
         if (montant < 0) {
           return 'Le montant ne peut pas être négatif';
         }
-        
+
         if (montant > _totalGeneral) {
           return 'Le montant payé ne peut pas dépasser le total';
         }
-        
+
         return null;
       },
       onChanged: (value) {

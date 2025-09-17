@@ -13,6 +13,7 @@ class Vente {
   final String? clientId;
   final String userId;
   final String entrepriseId;
+  final String sessionId;
   final DateTime createdAt;
   final DateTime? updatedAt;
 
@@ -31,6 +32,7 @@ class Vente {
     this.clientId,
     required this.userId,
     required this.entrepriseId,
+    required this.sessionId,
     required this.createdAt,
     this.updatedAt,
   });
@@ -47,36 +49,45 @@ class Vente {
       etat: map['etat'] as int? ?? 1,
       benefice: (map['benefice'] as num?)?.toDouble() ?? 0.0,
       montantPaye: (map['montant_paye'] as num?)?.toDouble() ?? 0.0,
-      dateVente: DateTime.parse(map['date_vente'] as String? ?? DateTime.now().toIso8601String()),
+      dateVente: DateTime.parse(
+        map['date_vente'] as String? ?? DateTime.now().toIso8601String(),
+      ),
       clientId: map['client_id'] as String?,
       userId: map['user_id'] as String? ?? '',
       entrepriseId: map['entreprise_id'] as String? ?? '',
-      createdAt: DateTime.parse(map['created_at'] as String? ?? DateTime.now().toIso8601String()),
-      updatedAt: map['updated_at'] != null ? DateTime.parse(map['updated_at'] as String) : null,
+      sessionId: map['session_id'] as String? ?? '',
+      createdAt: DateTime.parse(
+        map['created_at'] as String? ?? DateTime.now().toIso8601String(),
+      ),
+      updatedAt: map['updated_at'] != null
+          ? DateTime.parse(map['updated_at'] as String)
+          : null,
     );
   }
 
-  Map<String, dynamic> toMap() {
-    return {
-      'id': id,
-      'produit_id': produitId,
-      'quantite': quantite,
-      'produit_revenu': produitRevenu,
-      'description': description,
-      'prix_total': prixTotal,
-      'prix_unitaire': prixUnitaire,
-      'etat': etat,
-      'benefice': benefice,
-      'montant_paye': montantPaye,
-      'date_vente': dateVente.toIso8601String(),
-      'client_id': clientId,
-      'user_id': userId,
-      'entreprise_id': entrepriseId,
-      'created_at': createdAt.toIso8601String(),
-      'updated_at': updatedAt?.toIso8601String(),
-    };
-  }
-   Vente copyWith({
+Map<String, dynamic> toMap() {
+  return {
+    'id': id,
+    'produit_id': produitId,
+    'quantite': quantite,
+    'produit_revenu': produitRevenu,
+    'description': description,
+    'prix_total': prixTotal,
+    'prix_unitaire': prixUnitaire,
+    'etat': etat,
+    'benefice': benefice,
+    'montant_paye': montantPaye,
+    'date_vente': dateVente.toIso8601String(),
+    'client_id': clientId,
+    'user_id': userId,
+    'entreprise_id': entrepriseId,
+    'session_id': sessionId, // ASSUREZ-VOUS QUE C'EST BIEN LÀ
+    'created_at': createdAt.toIso8601String(),
+    'updated_at': updatedAt?.toIso8601String(),
+  };
+}
+
+  Vente copyWith({
     String? id,
     String? produitId,
     int? quantite,
@@ -91,6 +102,7 @@ class Vente {
     String? clientId,
     String? userId,
     String? entrepriseId,
+    String? sessionId,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -109,6 +121,7 @@ class Vente {
       clientId: clientId ?? this.clientId,
       userId: userId ?? this.userId,
       entrepriseId: entrepriseId ?? this.entrepriseId,
+      sessionId: sessionId ?? this.sessionId,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

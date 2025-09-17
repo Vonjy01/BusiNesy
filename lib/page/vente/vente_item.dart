@@ -1,4 +1,3 @@
-
 class VenteItem {
   final String id;
   final String produitId;

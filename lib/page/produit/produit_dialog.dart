@@ -3,14 +3,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:project6/controller/cat_prod_controller.dart';
 import 'package:project6/controller/produit_controller.dart';
 import 'package:project6/models/produits_model.dart';
-import 'package:project6/provider/entreprise_provider.dart';
 import 'package:uuid/uuid.dart';
 
 class ProduitDialog extends ConsumerStatefulWidget {
   final Produit? produit;
   final String userId;
+  final String entrepriseId;
 
-  const ProduitDialog({super.key, this.produit, required this.userId});
+  const ProduitDialog({
+    super.key, 
+    this.produit,
+    required this.userId,
+    required this.entrepriseId,
+  });
 
   @override
   ConsumerState<ProduitDialog> createState() => _ProduitDialogState();
@@ -29,6 +34,7 @@ class _ProduitDialogState extends ConsumerState<ProduitDialog> {
 
   final _uuid = const Uuid();
   int? _selectedCategorieId;
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -96,7 +102,7 @@ class _ProduitDialogState extends ConsumerState<ProduitDialog> {
                 controller: _prixVenteController,
                 keyboardType: TextInputType.numberWithOptions(decimal: true),
                 decoration: const InputDecoration(
-                  labelText: 'Prix de vente ',
+                  labelText: 'Prix de vente *',
                   border: OutlineInputBorder(),
                 ),
                 validator: (value) {
@@ -109,12 +115,12 @@ class _ProduitDialogState extends ConsumerState<ProduitDialog> {
                   return null;
                 },
               ),
-               const SizedBox(height: 16),
+              const SizedBox(height: 16),
               TextFormField(
                 controller: _prixAchatController,
                 keyboardType: TextInputType.numberWithOptions(decimal: true),
                 decoration: const InputDecoration(
-                  labelText: 'Prix d\'achat ',
+                  labelText: 'Prix d\'achat *',
                   border: OutlineInputBorder(),
                 ),
                 validator: (value) {
@@ -189,8 +195,6 @@ class _ProduitDialogState extends ConsumerState<ProduitDialog> {
                     return const Text('Aucune catégorie disponible');
                   }
                   
-                  // Si c'est une création et qu'aucune catégorie n'est encore sélectionnée,
-                  // on prend la première catégorie disponible par défaut
                   if (!isEditing && _selectedCategorieId == null) {
                     _selectedCategorieId = categories.first.id;
                   }
@@ -251,12 +255,18 @@ class _ProduitDialogState extends ConsumerState<ProduitDialog> {
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.pop(context),
+          onPressed: _isLoading ? null : () => Navigator.pop(context),
           child: const Text('Annuler'),
         ),
         ElevatedButton(
-          onPressed: () => _handleSubmit(context, isEditing),
-          child: Text(isEditing ? 'Sauvegarder' : 'Ajouter'),
+          onPressed: _isLoading ? null : () => _handleSubmit(context, isEditing),
+          child: _isLoading
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Text(isEditing ? 'Sauvegarder' : 'Ajouter'),
         ),
       ],
     );
@@ -271,9 +281,8 @@ class _ProduitDialogState extends ConsumerState<ProduitDialog> {
       return;
     }
 
-    final activeEntreprise = ref.read(activeEntrepriseProvider).value;
-    if (activeEntreprise == null) return;
-
+    setState(() => _isLoading = true);
+    
     try {
       final produit = Produit(
         id: isEditing ? widget.produit!.id : _uuid.v4(),
@@ -284,7 +293,7 @@ class _ProduitDialogState extends ConsumerState<ProduitDialog> {
         description: _descriptionController.text.trim(),
         defectueux: int.parse(_defectueuxController.text.isEmpty ? '0' : _defectueuxController.text),
         seuilAlerte: int.parse(_seuilAlerteController.text),
-        entrepriseId: activeEntreprise.id,
+        entrepriseId: widget.entrepriseId,
         createdAt: isEditing ? widget.produit!.createdAt : DateTime.now(),
         updatedAt: DateTime.now(),
         categorieId: _selectedCategorieId!,
@@ -293,12 +302,12 @@ class _ProduitDialogState extends ConsumerState<ProduitDialog> {
             : null,
       );
 
+      final controller = ref.read(produitControllerProvider.notifier);
+      
       if (isEditing) {
-        await ref.read(produitControllerProvider.notifier)
-            .updateProduit(produit, widget.userId);
+        await controller.updateProduit(produit, widget.userId);
       } else {
-        await ref.read(produitControllerProvider.notifier)
-            .addProduit(produit, widget.userId);
+        await controller.addProduit(produit, widget.userId);
       }
 
       if (mounted) Navigator.pop(context);
@@ -310,6 +319,10 @@ class _ProduitDialogState extends ConsumerState<ProduitDialog> {
             backgroundColor: Colors.red,
           ),
         );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
       }
     }
   }

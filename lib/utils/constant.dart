@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+
+final NumberFormat money = NumberFormat('#,###', 'fr_FR');
+
 
 const background_theme = Color.fromARGB(255, 142, 5, 166);
 // ignore: constant_identifier_names

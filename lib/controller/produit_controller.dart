@@ -10,16 +10,33 @@ final produitControllerProvider = AsyncNotifierProvider<ProduitController, List<
 class ProduitController extends AsyncNotifier<List<Produit>> {
   final DatabaseHelper _dbHelper = DatabaseHelper.instance;
   final Uuid _uuid = const Uuid();
+  String? _currentEntrepriseId;
 
   @override
   Future<List<Produit>> build() async {
-    return await loadProduits();
+    // Retourner une liste vide au début
+    return [];
   }
 
-  Future<List<Produit>> loadProduits() async {
+  Future<void> loadProduits(String entrepriseId) async {
+    // Éviter de recharger si c'est la même entreprise
+    if (_currentEntrepriseId == entrepriseId && state is! AsyncError) {
+      return;
+    }
+    
+    _currentEntrepriseId = entrepriseId;
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() => _loadProduits(entrepriseId: entrepriseId));
+  }
+
+  Future<List<Produit>> _loadProduits({required String entrepriseId}) async {
     try {
       final db = await _dbHelper.database;
-      final produits = await db.query('produits');
+      final produits = await db.query(
+        'produits',
+        where: 'entreprise_id = ?',
+        whereArgs: [entrepriseId],
+      );
       return produits.map(Produit.fromMap).toList();
     } catch (e, stack) {
       print('Error loading produits: $e\n$stack');
@@ -29,7 +46,6 @@ class ProduitController extends AsyncNotifier<List<Produit>> {
 
   Future<void> addProduit(Produit produit, String userId) async {
     try {
-      state = const AsyncValue.loading();
       final db = await _dbHelper.database;
 
       await db.transaction((txn) async {
@@ -44,7 +60,10 @@ class ProduitController extends AsyncNotifier<List<Produit>> {
         });
       });
 
-      state = await AsyncValue.guard(loadProduits);
+      // Recharger seulement si c'est la même entreprise
+      if (_currentEntrepriseId == produit.entrepriseId) {
+        state = await AsyncValue.guard(() => _loadProduits(entrepriseId: produit.entrepriseId));
+      }
     } catch (e, stack) {
       print('Error adding produit: $e\n$stack');
       state = AsyncValue.error(e, stack);
@@ -54,7 +73,6 @@ class ProduitController extends AsyncNotifier<List<Produit>> {
 
   Future<void> updateProduit(Produit produit, String userId) async {
     try {
-      state = const AsyncValue.loading();
       final db = await _dbHelper.database;
       final ancienProduit = state.value?.firstWhere((p) => p.id == produit.id);
 
@@ -80,7 +98,10 @@ class ProduitController extends AsyncNotifier<List<Produit>> {
         }
       });
 
-      state = await AsyncValue.guard(loadProduits);
+      // Recharger seulement si c'est la même entreprise
+      if (_currentEntrepriseId == produit.entrepriseId) {
+        state = await AsyncValue.guard(() => _loadProduits(entrepriseId: produit.entrepriseId));
+      }
     } catch (e, stack) {
       print('Error updating produit: $e\n$stack');
       state = AsyncValue.error(e, stack);

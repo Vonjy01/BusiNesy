@@ -1,4 +1,3 @@
-// lib/page/categorie_produit/categorie_dialog.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:project6/controller/cat_prod_controller.dart';
@@ -6,8 +5,13 @@ import 'package:project6/models/categorie_produit_model.dart';
 
 class CategorieDialog extends ConsumerStatefulWidget {
   final CategorieProduit? categorie;
+  final String entrepriseId;
   
-  const CategorieDialog({super.key, this.categorie});
+  const CategorieDialog({
+    super.key, 
+    this.categorie,
+    required this.entrepriseId,
+  });
 
   @override
   ConsumerState<CategorieDialog> createState() => _CategorieDialogState();
@@ -16,6 +20,7 @@ class CategorieDialog extends ConsumerStatefulWidget {
 class _CategorieDialogState extends ConsumerState<CategorieDialog> {
   final _libelleController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -44,9 +49,9 @@ class _CategorieDialogState extends ConsumerState<CategorieDialog> {
         key: _formKey,
         child: TextFormField(
           controller: _libelleController,
-          decoration: InputDecoration(
+          decoration: const InputDecoration(
             labelText: 'Nom de la catégorie',
-            border: const OutlineInputBorder(),
+            border: OutlineInputBorder(),
             hintText: 'Ex: Électronique, Alimentaire...',
           ),
           validator: (value) {
@@ -60,12 +65,18 @@ class _CategorieDialogState extends ConsumerState<CategorieDialog> {
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.pop(context),
+          onPressed: _isLoading ? null : () => Navigator.pop(context),
           child: const Text('Annuler'),
         ),
         ElevatedButton(
-          onPressed: () => _handleSubmit(context, isEditing),
-          child: Text(buttonText),
+          onPressed: _isLoading ? null : () => _handleSubmit(context, isEditing),
+          child: _isLoading
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Text(buttonText),
         ),
       ],
     );
@@ -74,19 +85,21 @@ class _CategorieDialogState extends ConsumerState<CategorieDialog> {
   Future<void> _handleSubmit(BuildContext context, bool isEditing) async {
     if (!_formKey.currentState!.validate()) return;
 
+    setState(() => _isLoading = true);
+    
     try {
+      final controller = ref.read(categorieProduitControllerProvider.notifier);
+      
       if (isEditing) {
         // Logique de modification
         final updated = widget.categorie!.copyWith(
           libelle: _libelleController.text.trim(),
           updatedAt: DateTime.now(),
         );
-        await ref.read(categorieProduitControllerProvider.notifier)
-            .updateCategorie(updated);
+        await controller.updateCategorie(updated);
       } else {
         // Logique d'ajout
-        await ref.read(categorieProduitControllerProvider.notifier)
-            .addCategorie(_libelleController.text.trim());
+        await controller.addCategorie(_libelleController.text.trim(), widget.entrepriseId);
       }
 
       if (mounted) Navigator.pop(context);
@@ -98,6 +111,10 @@ class _CategorieDialogState extends ConsumerState<CategorieDialog> {
             backgroundColor: Colors.red,
           ),
         );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
       }
     }
   }

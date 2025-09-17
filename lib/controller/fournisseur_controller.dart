@@ -6,7 +6,6 @@ import 'package:uuid/uuid.dart';
 final fournisseurControllerProvider = AsyncNotifierProvider<FournisseurController, List<Fournisseur>>(
   FournisseurController.new,
 );
-
 class FournisseurController extends AsyncNotifier<List<Fournisseur>> {
   final _dbHelper = DatabaseHelper.instance;
   final _uuid = Uuid();
@@ -14,16 +13,15 @@ class FournisseurController extends AsyncNotifier<List<Fournisseur>> {
 
   @override
   Future<List<Fournisseur>> build() async {
-    // Retourner une liste vide au début
     return [];
   }
 
-  Future<void> loadFournisseurs(String entrepriseId) async {
-    // Éviter de recharger si c'est la même entreprise
-    if (_currentEntrepriseId == entrepriseId && state is! AsyncError) {
+  Future<void> loadFournisseurs(String entrepriseId, {bool forceReload = false}) async {
+    // ⚡ Corrigé : on recharge si forceReload est demandé
+    if (!forceReload && _currentEntrepriseId == entrepriseId && state is! AsyncError) {
       return;
     }
-    
+
     _currentEntrepriseId = entrepriseId;
     state = const AsyncLoading();
     state = await AsyncValue.guard(() => _loadFournisseurs(entrepriseId: entrepriseId));
@@ -31,7 +29,7 @@ class FournisseurController extends AsyncNotifier<List<Fournisseur>> {
 
   Future<List<Fournisseur>> _loadFournisseurs({required String entrepriseId}) async {
     final db = await _dbHelper.database;
-    
+
     final fournisseurs = await db.query(
       'fournisseurs',
       where: 'entreprise_id = ?',
@@ -41,6 +39,28 @@ class FournisseurController extends AsyncNotifier<List<Fournisseur>> {
 
     return fournisseurs.map(Fournisseur.fromMap).toList();
   }
+
+  // ⚡ Corrigé : recherche directe en base (nom, téléphone, email, adresse)
+  Future<void> searchFournisseursMulti(String entrepriseId, String query) async {
+    final db = await _dbHelper.database;
+
+    final fournisseurs = await db.query(
+      'fournisseurs',
+      where:
+          'entreprise_id = ? AND (LOWER(nom) LIKE ? OR telephone LIKE ? OR LOWER(email) LIKE ? OR LOWER(adresse) LIKE ?)',
+      whereArgs: [
+        entrepriseId,
+        '%${query.toLowerCase()}%',
+        '%$query%',
+        '%${query.toLowerCase()}%',
+        '%${query.toLowerCase()}%',
+      ],
+      orderBy: 'nom ASC',
+    );
+
+    state = AsyncData(fournisseurs.map(Fournisseur.fromMap).toList());
+  }
+
 
   Future<void> addFournisseur({
     required String nom,
@@ -118,6 +138,18 @@ class FournisseurController extends AsyncNotifier<List<Fournisseur>> {
       rethrow;
     }
   }
+Future<void> searchFournisseurs(String entrepriseId, String query) async {
+  final db = await _dbHelper.database;
+
+  final fournisseurs = await db.query(
+    'fournisseurs',
+    where: 'entreprise_id = ? AND nom LIKE ?',
+    whereArgs: [entrepriseId, '%$query%'],
+    orderBy: 'nom ASC',
+  );
+
+  state = AsyncData(fournisseurs.map(Fournisseur.fromMap).toList());
+}
 
   Future<Fournisseur?> getFournisseurById(String id) async {
     final db = await _dbHelper.database;

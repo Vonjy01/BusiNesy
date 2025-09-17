@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:project6/models/vente_model.dart';
 import 'package:project6/models/produits_model.dart';
+import 'package:project6/models/vente_model.dart';
 import 'package:project6/services/database_helper.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
@@ -8,18 +8,21 @@ import 'package:uuid/uuid.dart';
 final venteControllerProvider = AsyncNotifierProvider<VenteController, List<Vente>>(
   VenteController.new,
 );
+
 class VenteController extends AsyncNotifier<List<Vente>> {
   final DatabaseHelper _dbHelper = DatabaseHelper.instance;
   final Uuid _uuid = const Uuid();
-  String? _currentEntrepriseId; // ← AJOUTEZ cette ligne
+  String? _currentEntrepriseId;
 
   @override
   Future<List<Vente>> build() async {
-    return []; // ← Liste vide au début
+    return [];
+  }
+    String generateNewSessionId() {
+    return _uuid.v4();
   }
 
-  // AJOUTEZ cette méthode (comme dans ClientController)
-    Future<void> loadVentes(String entrepriseId) async {
+  Future<void> loadVentes(String entrepriseId) async {
     if (_currentEntrepriseId == entrepriseId && state is! AsyncError) {
       return;
     }
@@ -34,9 +37,9 @@ class VenteController extends AsyncNotifier<List<Vente>> {
       final db = await _dbHelper.database;
       final ventes = await db.query(
         'ventes',
-        where: 'entreprise_id = ?', // ← Filtre par entreprise
+        where: 'entreprise_id = ?',
         whereArgs: [entrepriseId],
-        orderBy: 'date_vente DESC'
+        orderBy: 'date_vente DESC, session_id DESC'
       );
       return ventes.map(Vente.fromMap).toList();
     } catch (e, stack) {
@@ -45,8 +48,6 @@ class VenteController extends AsyncNotifier<List<Vente>> {
     }
   }
 
-
-  // MODIFIEZ addVente pour utiliser _loadVentes
   Future<void> addVente(Vente vente, String userId) async {
     try {
       state = const AsyncValue.loading();
@@ -59,7 +60,6 @@ class VenteController extends AsyncNotifier<List<Vente>> {
         }
       });
 
-      // CHANGEZ: utiliser _loadVentes au lieu de loadVentes
       if (_currentEntrepriseId == vente.entrepriseId) {
         state = await AsyncValue.guard(() => _loadVentes(entrepriseId: vente.entrepriseId));
       }
@@ -69,8 +69,33 @@ class VenteController extends AsyncNotifier<List<Vente>> {
       rethrow;
     }
   }
+Future<void> addVentesBatch(List<Vente> ventes, String userId) async {
+  try {
+    state = const AsyncValue.loading();
+    final db = await _dbHelper.database;
 
-  // MODIFIEZ updateVente pour utiliser _loadVentes
+    await db.transaction((txn) async {
+      for (final vente in ventes) {
+        // DEBUG: Affichez chaque vente avant insertion
+        print('Insertion vente - Session: ${vente.sessionId}, Produit: ${vente.produitId}');
+        
+        await txn.insert('ventes', vente.toMap());
+        if (vente.etat == 2 || vente.etat == 3) {
+          await _updateStockForVente(txn, vente, userId, isAdding: true);
+        }
+      }
+    });
+
+    if (_currentEntrepriseId == ventes.first.entrepriseId) {
+      state = await AsyncValue.guard(() => _loadVentes(entrepriseId: ventes.first.entrepriseId));
+    }
+  } catch (e, stack) {
+    print('Error adding batch ventes: $e\n$stack');
+    state = AsyncValue.error(e, stack);
+    rethrow;
+  }
+}
+
   Future<void> updateVente(Vente vente, String userId) async {
     try {
       state = const AsyncValue.loading();
@@ -98,7 +123,6 @@ class VenteController extends AsyncNotifier<List<Vente>> {
         await _handleStateAndQuantityChanges(txn, ancienneVente, vente, userId);
       });
 
-      // CHANGEZ: utiliser _loadVentes au lieu de loadVentes
       if (_currentEntrepriseId == vente.entrepriseId) {
         state = await AsyncValue.guard(() => _loadVentes(entrepriseId: vente.entrepriseId));
       }
@@ -109,7 +133,6 @@ class VenteController extends AsyncNotifier<List<Vente>> {
     }
   }
 
-  // MODIFIEZ deleteVente pour utiliser _loadVentes
   Future<void> deleteVente(String id, String userId) async {
     try {
       state = const AsyncValue.loading();
@@ -131,7 +154,6 @@ class VenteController extends AsyncNotifier<List<Vente>> {
           }
         });
 
-        // CHANGEZ: utiliser _loadVentes au lieu de loadVentes
         if (_currentEntrepriseId == vente.entrepriseId) {
           state = await AsyncValue.guard(() => _loadVentes(entrepriseId: vente.entrepriseId));
         }
@@ -143,8 +165,40 @@ class VenteController extends AsyncNotifier<List<Vente>> {
     }
   }
 
+  Future<void> deleteVentesBySession(String sessionId, String userId) async {
+    try {
+      state = const AsyncValue.loading();
+      final db = await _dbHelper.database;
 
-  // Méthodes helper pour la gestion du stock
+      final ventesResult = await db.query(
+        'ventes',
+        where: 'session_id = ?',
+        whereArgs: [sessionId],
+      );
+
+      if (ventesResult.isNotEmpty) {
+        final ventes = ventesResult.map(Vente.fromMap).toList();
+
+        await db.transaction((txn) async {
+          await txn.delete('ventes', where: 'session_id = ?', whereArgs: [sessionId]);
+          for (final vente in ventes) {
+            if (vente.etat == 2 || vente.etat == 3) {
+              await _updateStockForVente(txn, vente, userId, isAdding: false);
+            }
+          }
+        });
+
+        if (_currentEntrepriseId == ventes.first.entrepriseId) {
+          state = await AsyncValue.guard(() => _loadVentes(entrepriseId: ventes.first.entrepriseId));
+        }
+      }
+    } catch (e, stack) {
+      print('Error deleting ventes by session: $e\n$stack');
+      state = AsyncValue.error(e, stack);
+      rethrow;
+    }
+  }
+
   Future<void> _updateStockForVente(Transaction txn, Vente vente, String userId, {required bool isAdding}) async {
     final produitResult = await txn.query(
       'produits',
@@ -172,7 +226,6 @@ class VenteController extends AsyncNotifier<List<Vente>> {
         whereArgs: [vente.produitId],
       );
 
-      // Ajouter à l'historique des stocks
       await txn.insert('historique_stocks', {
         'produit_id': vente.produitId,
         'quantite': quantiteAjustee,
@@ -187,20 +240,15 @@ class VenteController extends AsyncNotifier<List<Vente>> {
   }
 
   Future<void> _handleStateAndQuantityChanges(Transaction txn, Vente ancienneVente, Vente nouvelleVente, String userId) async {
-    // Si l'état change
     if (ancienneVente.etat != nouvelleVente.etat) {
       await _handleEtatChange(txn, ancienneVente, nouvelleVente.etat, userId);
     }
 
-    // Si la quantité ou le produit_revenu change et que la vente est active (état 2 ou 3)
     if ((ancienneVente.quantite != nouvelleVente.quantite || 
          ancienneVente.produitRevenu != nouvelleVente.produitRevenu) &&
         (nouvelleVente.etat == 2 || nouvelleVente.etat == 3)) {
       
-      // Restaurer l'ancienne quantité
       await _updateStockForVente(txn, ancienneVente, userId, isAdding: false);
-      
-      // Appliquer la nouvelle quantité
       await _updateStockForVente(txn, nouvelleVente, userId, isAdding: true);
     }
   }
@@ -208,39 +256,46 @@ class VenteController extends AsyncNotifier<List<Vente>> {
   Future<void> _handleEtatChange(Transaction txn, Vente vente, int newEtat, String userId) async {
     final quantiteNetVendue = vente.quantite - vente.produitRevenu;
 
-    // De Validé/Incomplet (2/3) à Annulé (4) - Restaurer le stock
     if ((vente.etat == 2 || vente.etat == 3) && newEtat == 4) {
       await _updateStockForVente(txn, vente, userId, isAdding: false);
     }
-    
-    // De Annulé (4) à Validé/Incomplet (2/3) - Déduire le stock
     else if (vente.etat == 4 && (newEtat == 2 || newEtat == 3)) {
       await _updateStockForVente(txn, vente, userId, isAdding: true);
     }
-    
-    // De En attente (1) à Validé/Incomplet (2/3) - Déduire le stock
     else if (vente.etat == 1 && (newEtat == 2 || newEtat == 3)) {
       await _updateStockForVente(txn, vente, userId, isAdding: true);
     }
-    
-    // De Validé/Incomplet (2/3) à En attente (1) - Restaurer le stock
     else if ((vente.etat == 2 || vente.etat == 3) && newEtat == 1) {
       await _updateStockForVente(txn, vente, userId, isAdding: false);
     }
   }
 
-  // Méthode pour grouper les ventes par client et date
-  Map<String, List<Vente>> groupVentesByClientAndDate(List<Vente> ventes) {
-    final Map<String, List<Vente>> grouped = {};
-    
-    for (final vente in ventes) {
-      final key = '${vente.clientId}-${vente.dateVente.year}-${vente.dateVente.month}-${vente.dateVente.day}';
-      if (!grouped.containsKey(key)) {
-        grouped[key] = [];
-      }
-      grouped[key]!.add(vente);
+Map<String, List<Vente>> groupVentesBySession(List<Vente> ventes) {
+  final Map<String, List<Vente>> grouped = {};
+  
+  for (final vente in ventes) {
+    if (!grouped.containsKey(vente.sessionId)) {
+      grouped[vente.sessionId] = [];
     }
-    
-    return grouped;
+    grouped[vente.sessionId]!.add(vente);
+  }
+  
+  return grouped;
+}
+
+  Future<List<Vente>> getVentesBySession(String sessionId) async {
+    try {
+      final db = await _dbHelper.database;
+      final ventes = await db.query(
+        'ventes',
+        where: 'session_id = ?',
+        whereArgs: [sessionId],
+        orderBy: 'created_at ASC'
+      );
+      return ventes.map(Vente.fromMap).toList();
+    } catch (e, stack) {
+      print('Error getting ventes by session: $e\n$stack');
+      rethrow;
+    }
   }
 }

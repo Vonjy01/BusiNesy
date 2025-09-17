@@ -10,6 +10,7 @@ import 'package:project6/page/vente/vente_details.dart';
 import 'package:project6/widget/app_drawer.dart';
 import 'package:project6/widget/Header.dart';
 import 'package:project6/utils/constant.dart';
+import 'package:intl/intl.dart';
 
 class VenteList extends ConsumerStatefulWidget {
   const VenteList({Key? key}) : super(key: key);
@@ -17,6 +18,7 @@ class VenteList extends ConsumerStatefulWidget {
   @override
   ConsumerState<VenteList> createState() => _VenteListState();
 }
+
 class _VenteListState extends ConsumerState<VenteList> {
   String? _lastLoadedEntrepriseId;
 
@@ -97,106 +99,108 @@ class _VenteListState extends ConsumerState<VenteList> {
       },
     );
   }
-Widget _buildVenteList(List<Vente> ventes, List<Client> clients, WidgetRef ref) {
-  // Ajouter cette vérification
-  if (ventes.isEmpty && ref.read(venteControllerProvider).isLoading) {
-    return const Center(child: CircularProgressIndicator());
-  }
-  
-  if (ventes.isEmpty) {
-    return const Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.shopping_cart_outlined, size: 48, color: Colors.grey),
-          SizedBox(height: 16),
-          Text('Aucune vente trouvée', style: TextStyle(color: Colors.grey)),
-        ],
+
+  Widget _buildVenteList(List<Vente> ventes, List<Client> clients, WidgetRef ref) {
+    if (ventes.isEmpty) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.shopping_cart_outlined, size: 48, color: Colors.grey),
+            SizedBox(height: 16),
+            Text('Aucune vente trouvée', style: TextStyle(color: Colors.grey)),
+          ],
+        ),
+      );
+    }
+
+    final groupedBySession = ref.read(venteControllerProvider.notifier).groupVentesBySession(ventes);
+    final sessionIds = groupedBySession.keys.toList();
+
+    return RefreshIndicator(
+      onRefresh: () async {
+        final activeEntreprise = ref.read(activeEntrepriseProvider).value;
+        if (activeEntreprise != null) {
+          await ref.read(venteControllerProvider.notifier).loadVentes(activeEntreprise.id);
+          await ref.read(clientControllerProvider.notifier).loadClients(activeEntreprise.id);
+        }
+      },
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: sessionIds.length,
+        itemBuilder: (context, index) {
+          final sessionId = sessionIds[index];
+          final sessionVentes = groupedBySession[sessionId]!;
+          final firstVente = sessionVentes.first;
+          
+          final client = clients.firstWhere(
+            (c) => c.id == firstVente.clientId,
+            orElse: () => Client(
+              id: '',
+              nom: 'Client inconnu',
+              entrepriseId: '',
+              createdAt: DateTime.now(),
+            ),
+          );
+
+          if (client.id.isEmpty) {
+            return const SizedBox.shrink();
+          }
+          
+          final total = sessionVentes.fold(0.0, (sum, v) => sum + v.prixTotal);
+          final dateFormat = DateFormat('dd/MM/yyyy HH:mm');
+          
+          // Dans _buildVenteList() de VenteList
+return Card(
+  margin: const EdgeInsets.only(bottom: 16),
+  elevation: 2,
+  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+  child: ListTile(
+    contentPadding: const EdgeInsets.all(16),
+    leading: CircleAvatar(
+      backgroundColor: background_theme,
+      child: Text(
+        client.nom[0], 
+        style: TextStyle(color: color_white)
+      ),
+    ),
+    title: Text(
+      client.nom,
+      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+    ),
+    subtitle: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 8),
+        Text('${sessionVentes.length} produit(s)'),
+        Text('Date: ${dateFormat.format(firstVente.dateVente)}'),
+        Text('Total: ${total.toStringAsFixed(2)} $devise'),
+        // AFFICHEZ L'ID DE SESSION DANS LA LISTE
+        Text(
+          sessionId.isNotEmpty 
+            ? 'Session: ${sessionId.length > 8 ? sessionId.substring(0, 8) + '...' : sessionId}'
+            : 'Session: Non défini',
+          style: const TextStyle(fontSize: 10, color: Colors.grey, fontFamily: 'monospace'),
+        ),
+      ],
+    ),
+    trailing: IconButton(
+      icon: const Icon(Icons.arrow_forward),
+      onPressed: () => _showSessionDetails(context, sessionVentes, client, sessionId),
+    ),
+    onTap: () => _showSessionDetails(context, sessionVentes, client, sessionId),
+  ),
+);
+        },
       ),
     );
   }
-
-
-  // Grouper les ventes par client
-  final Map<String, List<Vente>> ventesParClient = {};
-  for (final vente in ventes) {
-    if (vente.clientId != null) {
-      if (!ventesParClient.containsKey(vente.clientId)) {
-        ventesParClient[vente.clientId!] = [];
-      }
-      ventesParClient[vente.clientId!]!.add(vente);
-    }
-  }
-
-  return RefreshIndicator(
-    onRefresh: () async {
-      final activeEntreprise = ref.read(activeEntrepriseProvider).value;
-      if (activeEntreprise != null) {
-        await ref.read(venteControllerProvider.notifier).loadVentes(activeEntreprise.id);
-        await ref.read(clientControllerProvider.notifier).loadClients(activeEntreprise.id);
-      }
-    },
-    child: ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: ventesParClient.length,
-      itemBuilder: (context, index) {
-        final clientId = ventesParClient.keys.elementAt(index);
-        final clientVentes = ventesParClient[clientId]!;
-        
-        final client = clients.firstWhere(
-          (c) => c.id == clientId,
-          orElse: () => Client(
-            id: '',
-            nom: 'Client inconnu',
-            entrepriseId: '',
-            createdAt: DateTime.now(),
-          ),
-        );
-
-        if (client.id.isEmpty) {
-          return const SizedBox.shrink();
-        }
-        
-        final total = clientVentes.fold(0.0, (sum, v) => sum + v.prixTotal);
-        
-        return Card(
-          margin: const EdgeInsets.only(bottom: 16),
-          elevation: 2,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          child: ListTile(
-            contentPadding: const EdgeInsets.all(16),
-            leading: CircleAvatar(
-              backgroundColor: background_theme,
-              child: Text(
-                client.nom[0], 
-                style: TextStyle(color: color_white)
-              ),
-            ),
-            title: Text(
-              client.nom,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-            ),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 8),
-                Text('${clientVentes.length} vente(s)'),
-                Text('Total: ${total.toStringAsFixed(2)} $devise'),
-              ],
-            ),
-            trailing: IconButton(
-              icon: const Icon(Icons.arrow_forward),
-              onPressed: () => _showClientDetails(context, clientVentes, client),
-            ),
-            onTap: () => _showClientDetails(context, clientVentes, client),
-          ),
-        );
-      },
-    ),
-  );
-}
-
 void _createNewVente(BuildContext context, String userId, String entrepriseId, WidgetRef ref) {
+  final venteController = ref.read(venteControllerProvider.notifier);
+  final newSessionId = venteController.generateNewSessionId();
+  
+  print('Création nouvelle vente avec session: $newSessionId');
+  
   Navigator.push(
     context,
     MaterialPageRoute(
@@ -205,29 +209,29 @@ void _createNewVente(BuildContext context, String userId, String entrepriseId, W
         client: null,
         userId: userId,
         entrepriseId: entrepriseId,
+        sessionId: newSessionId,
       ),
     ),
-  ).then((_) {
-    if (mounted) {
-      // Recharger les ventes de l'entreprise active au lieu de refresh
+  ).then((success) {
+    if (success == true && mounted) {
       final activeEntreprise = ref.read(activeEntrepriseProvider).value;
       if (activeEntreprise != null) {
+        print('Rechargement des ventes après sauvegarde');
         ref.read(venteControllerProvider.notifier).loadVentes(activeEntreprise.id);
       }
     }
   });
 }
-
-  void _showClientDetails(BuildContext context, List<Vente> ventes, Client client) {
-    // Ouvrir la page de détail AVEC le client (pour ajouter à ses ventes existantes)
+  void _showSessionDetails(BuildContext context, List<Vente> ventes, Client client, String sessionId) {
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => VenteDetailPage(
-          ventes: ventes, // Ventes existantes de ce client
-          client: client, // Client spécifique
+          ventes: ventes,
+          client: client,
           userId: ventes.first.userId,
           entrepriseId: ventes.first.entrepriseId,
+          sessionId: sessionId,
         ),
       ),
     );

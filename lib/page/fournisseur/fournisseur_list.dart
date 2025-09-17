@@ -30,9 +30,12 @@ class _FournisseurListState extends ConsumerState<FournisseurList> {
 
   void _loadFournisseursIfNeeded() {
     final activeEntreprise = ref.read(activeEntrepriseProvider).value;
-    if (activeEntreprise != null && _lastLoadedEntrepriseId != activeEntreprise.id) {
+    if (activeEntreprise != null &&
+        _lastLoadedEntrepriseId != activeEntreprise.id) {
       _lastLoadedEntrepriseId = activeEntreprise.id;
-      ref.read(fournisseurControllerProvider.notifier).loadFournisseurs(activeEntreprise.id);
+      ref
+          .read(fournisseurControllerProvider.notifier)
+          .loadFournisseurs(activeEntreprise.id);
     }
   }
 
@@ -42,27 +45,46 @@ class _FournisseurListState extends ConsumerState<FournisseurList> {
     final activeEntreprise = ref.watch(activeEntrepriseProvider).value;
     final fournisseursAsync = ref.watch(fournisseurControllerProvider);
 
-    if (activeEntreprise != null && _lastLoadedEntrepriseId != activeEntreprise.id) {
+    if (activeEntreprise != null &&
+        _lastLoadedEntrepriseId != activeEntreprise.id) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _lastLoadedEntrepriseId = activeEntreprise.id;
-        ref.read(fournisseurControllerProvider.notifier).loadFournisseurs(activeEntreprise.id);
+        ref
+            .read(fournisseurControllerProvider.notifier)
+            .loadFournisseurs(activeEntreprise.id);
       });
     }
 
     return authState.when(
-      loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (error, stack) => Scaffold(body: Center(child: Text('Erreur: $error'))),
+      loading: () =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
+      error: (error, stack) =>
+          Scaffold(body: Center(child: Text('Erreur: $error'))),
       data: (user) {
         if (user == null) {
-          return const Scaffold(body: Center(child: Text('Utilisateur non connecté')));
+          return const Scaffold(
+            body: Center(child: Text('Utilisateur non connecté')),
+          );
         }
 
         return Scaffold(
           drawer: AppDrawer(user: user),
           body: Column(
             children: [
-              const Header(title: 'Fournisseurs'),
-              if (activeEntreprise == null) 
+              // ✅ Header avec bouton recherche
+              Header(
+                title: 'Fournisseurs',
+                actions: [
+                  if (activeEntreprise != null)
+                    IconButton(
+                      icon: const Icon(Icons.search),
+                      onPressed: () =>
+                          _showSearchDialog(context, ref, activeEntreprise.id),
+                    ),
+                ],
+              ),
+
+              if (activeEntreprise == null)
                 Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Text(
@@ -71,114 +93,201 @@ class _FournisseurListState extends ConsumerState<FournisseurList> {
                     textAlign: TextAlign.center,
                   ),
                 ),
-              Expanded(
-                child: activeEntreprise == null 
-                  ? const SizedBox()
-                  : fournisseursAsync.when(
-                      loading: () => const Center(child: CircularProgressIndicator()),
-                      error: (error, stack) => Center(
-                        child: Text('Erreur: $error', style: const TextStyle(color: Colors.red)),
-                      ),
-                      data: (fournisseurs) {
-                        if (fournisseurs.isEmpty) {
-                          return Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(Icons.group, size: 50, color: Colors.grey),
-                                const SizedBox(height: 16),
-                                const Text('Aucun fournisseur enregistré'),
-                                const SizedBox(height: 16),
-                                ElevatedButton(
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: background_theme,
-                                  ),
-                                  onPressed: () => _showAddDialog(context, activeEntreprise.id),
-                                  child: const Text('Ajouter un fournisseur', 
-                                      style: TextStyle(color: Colors.white)),
-                                ),
-                              ],
-                            ),
-                          );
-                        }
 
-                        return ListView.separated(
-                          padding: const EdgeInsets.all(16),
-                          itemCount: fournisseurs.length,
-                          separatorBuilder: (context, index) => const Divider(height: 20),
-                          itemBuilder: (context, index) {
-                            final fournisseur = fournisseurs[index];
-                            return Card(
-                              elevation: 2,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: ListTile(
-                                contentPadding: const EdgeInsets.symmetric(
-                                  vertical: 8, horizontal: 16),
-                                leading: CircleAvatar(
-                                  backgroundColor: background_theme.withOpacity(0.2),
-                                  child: Text(
-                                    fournisseur.nom[0].toUpperCase(),
-                                    style: TextStyle(color: background_theme),
+              Expanded(
+                child: activeEntreprise == null
+                    ? const SizedBox()
+                    : fournisseursAsync.when(
+                        loading: () =>
+                            const Center(child: CircularProgressIndicator()),
+                        error: (error, stack) => Center(
+                          child: Text(
+                            'Erreur: $error',
+                            style: const TextStyle(color: Colors.red),
+                          ),
+                        ),
+                        data: (fournisseurs) {
+                          if (fournisseurs.isEmpty) {
+                            return Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(
+                                    Icons.group,
+                                    size: 50,
+                                    color: Colors.grey,
                                   ),
-                                ),
-                                title: Text(
-                                  fournisseur.nom,
-                                  style: const TextStyle(fontWeight: FontWeight.bold),
-                                ),
-                                subtitle: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    if (fournisseur.telephone != null)
-                                      Text(fournisseur.telephone!),
-                                    if (fournisseur.email != null)
-                                      Text(fournisseur.email!),
-                                  ],
-                                ),
-                                trailing: PopupMenuButton<String>(
-                                  icon: const Icon(Icons.more_vert),
-                                  onSelected: (value) => _handlePopupSelection(
-                                    value, context, fournisseur, activeEntreprise.id),
-                                  itemBuilder: (BuildContext context) {
-                                    return [
-                                      const PopupMenuItem(
-                                        value: 'detail',
-                                        child: Text('Détails'),
-                                      ),
-                                      const PopupMenuItem(
-                                        value: 'modifier',
-                                        child: Text('Modifier'),
-                                      ),
-                                      const PopupMenuItem(
-                                        value: 'appeler',
-                                        child: Text('Appeler'),
-                                      ),
-                                      const PopupMenuItem(
-                                        value: 'supprimer',
-                                        child: Text('Supprimer', style: TextStyle(color: Colors.red)),
-                                      ),
-                                    ];
-                                  },
-                                ),
+                                  const SizedBox(height: 16),
+                                  const Text('Aucun fournisseur enregistré'),
+                                  const SizedBox(height: 16),
+                                  ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: background_theme,
+                                    ),
+                                    onPressed: () => _showAddDialog(
+                                      context,
+                                      activeEntreprise.id,
+                                    ),
+                                    child: const Text(
+                                      'Ajouter un fournisseur',
+                                      style: TextStyle(color: Colors.white),
+                                    ),
+                                  ),
+                                ],
                               ),
                             );
-                          },
-                        );
-                      },
-                    ),
+                          }
+
+                          return ListView.separated(
+                            padding: const EdgeInsets.all(16),
+                            itemCount: fournisseurs.length,
+                            separatorBuilder: (context, index) =>
+                                const Divider(height: 20),
+                            itemBuilder: (context, index) {
+                              final fournisseur = fournisseurs[index];
+                              return Card(
+                                elevation: 2,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: ListTile(
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    vertical: 8,
+                                    horizontal: 16,
+                                  ),
+                                  leading: CircleAvatar(
+                                    backgroundColor: background_theme
+                                        .withOpacity(0.2),
+                                    child: Text(
+                                      fournisseur.nom[0].toUpperCase(),
+                                      style: TextStyle(color: background_theme),
+                                    ),
+                                  ),
+                                  title: Text(
+                                    fournisseur.nom,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  subtitle: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      if (fournisseur.telephone != null)
+                                        Text(fournisseur.telephone!),
+                                      if (fournisseur.email != null)
+                                        Text(fournisseur.email!),
+                                    ],
+                                  ),
+                                  trailing: PopupMenuButton<String>(
+                                    icon: const Icon(Icons.more_vert),
+                                    onSelected: (value) =>
+                                        _handlePopupSelection(
+                                          value,
+                                          context,
+                                          fournisseur,
+                                          activeEntreprise.id,
+                                        ),
+                                    itemBuilder: (BuildContext context) {
+                                      return [
+                                        const PopupMenuItem(
+                                          value: 'detail',
+                                          child: Text('Détails'),
+                                        ),
+                                        const PopupMenuItem(
+                                          value: 'modifier',
+                                          child: Text('Modifier'),
+                                        ),
+                                        const PopupMenuItem(
+                                          value: 'appeler',
+                                          child: Text('Appeler'),
+                                        ),
+                                        const PopupMenuItem(
+                                          value: 'supprimer',
+                                          child: Text(
+                                            'Supprimer',
+                                            style: TextStyle(color: Colors.red),
+                                          ),
+                                        ),
+                                      ];
+                                    },
+                                  ),
+                                ),
+                              );
+                            },
+                          );
+                        },
+                      ),
               ),
             ],
           ),
-          floatingActionButton: activeEntreprise == null 
-            ? null
-            : FloatingActionButton(
-                onPressed: () => _showAddDialog(context, activeEntreprise.id),
-                backgroundColor: background_theme,
-                child: const Icon(Icons.add, color: Colors.white),
-              ),
+          floatingActionButton: activeEntreprise == null
+              ? null
+              : FloatingActionButton(
+                  onPressed: () => _showAddDialog(context, activeEntreprise.id),
+                  backgroundColor: background_theme,
+                  child: const Icon(Icons.add, color: Colors.white),
+                ),
         );
       },
+    );
+  }
+
+  void _showSearchDialog(
+    BuildContext context,
+    WidgetRef ref,
+    String entrepriseId,
+  ) {
+    final searchController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text("Rechercher un fournisseur"),
+        content: TextField(
+          controller: searchController,
+          decoration: InputDecoration(
+            hintText: "Nom, téléphone, email, adresse...",
+            prefixIcon: const Icon(Icons.search),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        ),
+        actions: [
+          // ✅ Bouton Afficher tout
+          TextButton(
+            onPressed: () {
+              ref
+                  .read(fournisseurControllerProvider.notifier)
+                  .loadFournisseurs(
+                    entrepriseId,
+                    forceReload: true,
+                  ); // ⚡ ajout forceReload
+              Navigator.pop(context);
+            },
+            child: const Text("Afficher tout"),
+          ),
+
+          // ✅ Bouton Rechercher
+          ElevatedButton(
+            onPressed: () {
+              final query = searchController.text.trim();
+              if (query.isNotEmpty) {
+                ref
+                    .read(fournisseurControllerProvider.notifier)
+                    .searchFournisseursMulti(entrepriseId, query);
+              } else {
+                // Si vide, recharge tous
+                ref
+                    .read(fournisseurControllerProvider.notifier)
+                    .loadFournisseurs(entrepriseId);
+              }
+              Navigator.pop(context);
+            },
+            child: const Text("Rechercher"),
+          ),
+        ],
+      ),
     );
   }
 
@@ -189,7 +298,12 @@ class _FournisseurListState extends ConsumerState<FournisseurList> {
     );
   }
 
-  void _handlePopupSelection(String value, BuildContext context, Fournisseur fournisseur, String entrepriseId) {
+  void _handlePopupSelection(
+    String value,
+    BuildContext context,
+    Fournisseur fournisseur,
+    String entrepriseId,
+  ) {
     switch (value) {
       case 'detail':
         _showDetails(context, fournisseur);
@@ -198,8 +312,8 @@ class _FournisseurListState extends ConsumerState<FournisseurList> {
         showDialog(
           context: context,
           builder: (context) => EditFournisseurDialog(
-            fournisseur: fournisseur, 
-            entrepriseId: entrepriseId
+            fournisseur: fournisseur,
+            entrepriseId: entrepriseId,
           ),
         );
         break;
@@ -267,7 +381,7 @@ class _FournisseurListState extends ConsumerState<FournisseurList> {
     );
   }
 
-  /// Ouvre l'application téléphone avec le numéro prérempli
+  /// 📞 Appeler un numéro
   Future<void> _callNumber(String? phoneNumber) async {
     if (phoneNumber == null || phoneNumber.isEmpty) return;
 
@@ -287,7 +401,11 @@ class _FournisseurListState extends ConsumerState<FournisseurList> {
     }
   }
 
-  Future<void> _confirmDelete(BuildContext context, Fournisseur fournisseur, String entrepriseId) async {
+  Future<void> _confirmDelete(
+    BuildContext context,
+    Fournisseur fournisseur,
+    String entrepriseId,
+  ) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -310,7 +428,11 @@ class _FournisseurListState extends ConsumerState<FournisseurList> {
     );
   }
 
-  Future<void> _deleteFournisseur(BuildContext context, Fournisseur fournisseur, String entrepriseId) async {
+  Future<void> _deleteFournisseur(
+    BuildContext context,
+    Fournisseur fournisseur,
+    String entrepriseId,
+  ) async {
     try {
       final controller = ref.read(fournisseurControllerProvider.notifier);
       await controller.deleteFournisseur(fournisseur.id, entrepriseId);

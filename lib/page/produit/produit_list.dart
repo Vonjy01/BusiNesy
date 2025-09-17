@@ -8,6 +8,7 @@ import 'package:project6/models/produits_model.dart';
 import 'package:project6/models/user_model.dart';
 import 'package:project6/page/produit/produit_dialog.dart';
 import 'package:project6/page/produit/produit_search.dart';
+import 'package:project6/provider/entreprise_provider.dart';
 import 'package:project6/utils/constant.dart';
 import 'package:project6/widget/Header.dart';
 import 'package:project6/widget/app_drawer.dart';
@@ -24,87 +25,87 @@ class _ProduitListState extends ConsumerState<ProduitList> {
   String _searchName = '';
   String _searchCategory = 'Toutes';
   List<String> _categories = ['Toutes'];
+  String? _lastLoadedEntrepriseId;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(produitControllerProvider.notifier).loadProduits();
-      // Enlever .loadCategories() si ça n'existe pas
+      _loadProduitsIfNeeded();
+      _loadCategories();
     });
-    _loadCategories();
   }
 
-Future<void> _loadCategories() async {
-  final categoriesState = ref.read(categorieProduitControllerProvider);
-  
-  print('État des catégories: $categoriesState'); // Debug
-  
-  categoriesState.when(
-    data: (categories) {
-      print('Nombre de catégories: ${categories.length}'); // Debug
-      setState(() {
-        _categories = ['Toutes', ...categories.map((c) => c.libelle).toList()];
-        print('Catégories finales: $_categories'); // Debug
-      });
-    },
-    error: (error, stack) {
-      print('Erreur chargement catégories: $error');
-    },
-    loading: () {
-      print('Chargement des catégories en cours...'); // Debug
-    },
-  );
-}
+  void _loadProduitsIfNeeded() {
+    final activeEntreprise = ref.read(activeEntrepriseProvider).value;
+    if (activeEntreprise != null && _lastLoadedEntrepriseId != activeEntreprise.id) {
+      _lastLoadedEntrepriseId = activeEntreprise.id;
+      ref.read(produitControllerProvider.notifier).loadProduits(activeEntreprise.id);
+    }
+  }
 
-void _showSearchDialog() async {
-  // Attendre que les catégories soient chargées
-  final categoriesState = ref.read(categorieProduitControllerProvider);
-  
-  categoriesState.when(
-    data: (categories) {
-      // Créer la liste des noms de catégories
-      final categoryNames = ['Toutes', ...categories.map((c) => c.libelle).toList()];
-      
-      showDialog(
-        context: context,
-        builder: (context) => ProduitSearchDialog(
-          produits: ref.read(produitControllerProvider).value ?? [],
-          categories: categoryNames,
-          onSearch: (name, category) {
-            setState(() {
-              _searchName = name;
-              _searchCategory = category;
-            });
-          },
-        ),
-      );
-    },
-    error: (error, stack) {
-      // Afficher une erreur si le chargement échoue
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur chargement catégories: $error')),
-      );
-    },
-    loading: () {
-      // Afficher un indicateur de chargement
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const AlertDialog(
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CircularProgressIndicator(),
-              SizedBox(height: 16),
-              Text('Chargement des catégories...'),
-            ],
+  Future<void> _loadCategories() async {
+    final categoriesState = ref.read(categorieProduitControllerProvider);
+    
+    categoriesState.when(
+      data: (categories) {
+        setState(() {
+          _categories = ['Toutes', ...categories.map((c) => c.libelle).toList()];
+        });
+      },
+      error: (error, stack) {
+        print('Erreur chargement catégories: $error');
+      },
+      loading: () {
+        print('Chargement des catégories en cours...');
+      },
+    );
+  }
+
+  void _showSearchDialog() async {
+    final categoriesState = ref.read(categorieProduitControllerProvider);
+    
+    categoriesState.when(
+      data: (categories) {
+        final categoryNames = ['Toutes', ...categories.map((c) => c.libelle).toList()];
+        
+        showDialog(
+          context: context,
+          builder: (context) => ProduitSearchDialog(
+            produits: ref.read(produitControllerProvider).value ?? [],
+            categories: categoryNames,
+            onSearch: (name, category) {
+              setState(() {
+                _searchName = name;
+                _searchCategory = category;
+              });
+            },
           ),
-        ),
-      );
-    },
-  );
-}
+        );
+      },
+      error: (error, stack) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur chargement catégories: $error')),
+        );
+      },
+      loading: () {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const AlertDialog(
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('Chargement des catégories...'),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   List<Produit> _filterProduits(List<Produit> produits, List<CategorieProduit> categories) {
     return produits.where((produit) {
@@ -124,7 +125,7 @@ void _showSearchDialog() async {
     
     final categorie = categories.firstWhere(
       (c) => c.id == categorieId,
-      orElse: () => CategorieProduit(id: 0, libelle: 'Inconnu', entrepriseId: '', createdAt: DateTime.now(), updatedAt: DateTime.now()),
+      orElse: () => CategorieProduit(id: 0, libelle: 'Inconnu', entrepriseId: '', createdAt: DateTime.now()),
     );
     return categorie.libelle;
   }
@@ -134,6 +135,15 @@ void _showSearchDialog() async {
     final produitsState = ref.watch(produitControllerProvider);
     final categoriesState = ref.watch(categorieProduitControllerProvider);
     final authState = ref.watch(authControllerProvider);
+    final activeEntreprise = ref.watch(activeEntrepriseProvider).value;
+
+    // Recharger seulement si l'entreprise active change
+    if (activeEntreprise != null && _lastLoadedEntrepriseId != activeEntreprise.id) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _lastLoadedEntrepriseId = activeEntreprise.id;
+        ref.read(produitControllerProvider.notifier).loadProduits(activeEntreprise.id);
+      });
+    }
 
     return authState.when(
       loading: () => _buildLoadingScreen(),
@@ -300,7 +310,7 @@ void _showSearchDialog() async {
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showAddDialog(context, userId),
         backgroundColor: background_theme,
-        child: Icon(Icons.add, color: color_white),
+        child: const Icon(Icons.add, color: Colors.white),
       ),
     );
   }
@@ -351,7 +361,7 @@ void _showSearchDialog() async {
           
           return ProduitWidget(
             product: produit,
-            categorieLibelle: _getCategorieLibelle(produit.categorieId, categories), // Ajouter cette ligne
+            categorieLibelle: _getCategorieLibelle(produit.categorieId, categories),
             isLowStock: isLowStock,
             isOutOfStock: produit.stockDisponible <= 0,
             showDefective: false,
@@ -401,7 +411,7 @@ void _showSearchDialog() async {
           final produit = produits[index];
           return ProduitWidget(
             product: produit,
-            categorieLibelle: _getCategorieLibelle(produit.categorieId, categories), // Ajouter cette ligne
+            categorieLibelle: _getCategorieLibelle(produit.categorieId, categories),
             isLowStock: produit.stockDisponible > 0 && 
                       produit.stockDisponible <= produit.seuilAlerte,
             isOutOfStock: produit.stockDisponible <= 0,
@@ -415,16 +425,22 @@ void _showSearchDialog() async {
   }
 
   void _showAddDialog(BuildContext context, String userId) {
+    final activeEntreprise = ref.read(activeEntrepriseProvider).value;
+    if (activeEntreprise == null) return;
+
     showDialog(
       context: context,
-      builder: (context) => ProduitDialog(userId: userId),
-    ).then((_) => ref.refresh(produitControllerProvider));
+      builder: (context) => ProduitDialog(userId: userId, entrepriseId: activeEntreprise.id),
+    );
   }
 
   void _showEditDialog(BuildContext context, Produit produit, String userId) {
+    final activeEntreprise = ref.read(activeEntrepriseProvider).value;
+    if (activeEntreprise == null) return;
+
     showDialog(
       context: context,
-      builder: (context) => ProduitDialog(produit: produit, userId: userId),
-    ).then((_) => ref.refresh(produitControllerProvider));
+      builder: (context) => ProduitDialog(produit: produit, userId: userId, entrepriseId: activeEntreprise.id),
+    );
   }
 }
