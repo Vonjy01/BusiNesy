@@ -241,7 +241,26 @@ Future<void> _adjustStockForRevenuChange(Transaction txn, Vente vente, String us
     print('Ajustement revenu: ${produit.nom} - Adjustment: $ajustement, Nouveau stock: $nouveauStock');
   }
 }
-
+Future<String?> getCategorieNameForProduit(String produitId) async {
+  try {
+    final db = await _dbHelper.database;
+    
+    final result = await db.rawQuery('''
+      SELECT cp.libelle 
+      FROM produits p
+      LEFT JOIN categorie_produit cp ON p.categorie_id = cp.id
+      WHERE p.id = ?
+    ''', [produitId]);
+    
+    if (result.isNotEmpty) {
+      return result.first['libelle'] as String?;
+    }
+    return null;
+  } catch (e) {
+    print('Erreur récupération catégorie: $e');
+    return null;
+  }
+}
   Future<void> _updateStockForVente(Transaction txn, Vente vente, String userId, {required bool isAdding}) async {
     final produitResult = await txn.query(
       'produits',
