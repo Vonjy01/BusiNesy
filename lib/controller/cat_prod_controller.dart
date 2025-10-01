@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:project6/controller/entreprise_controller.dart';
 import 'package:project6/models/categorie_produit_model.dart';
+import 'package:project6/models/entreprise_model.dart';
 import 'package:project6/services/database_helper.dart';
 
 final categorieProduitControllerProvider = AsyncNotifierProvider<CategorieProduitController, List<CategorieProduit>>(
@@ -12,8 +14,32 @@ class CategorieProduitController extends AsyncNotifier<List<CategorieProduit>> {
 
   @override
   Future<List<CategorieProduit>> build() async {
-    // Retourner une liste vide au début
-    return [];
+    // Écouter les changements d'entreprise comme dans ProduitController
+    ref.listen<AsyncValue<Entreprise?>>(
+      activeEntrepriseProvider,
+      (previous, next) {
+        next.whenData((entreprise) {
+          if (entreprise != null && _currentEntrepriseId != entreprise.id) {
+            loadCategories(entreprise.id);
+          }
+        });
+      },
+    );
+
+    final activeEntreprise = ref.read(activeEntrepriseProvider).value;
+    if (activeEntreprise == null) {
+      return [];
+    }
+    
+    _currentEntrepriseId = activeEntreprise.id;
+    return await _loadCategories(entrepriseId: activeEntreprise.id);
+  }
+
+  Future<void> refreshCategories() async {
+    if (_currentEntrepriseId != null) {
+      state = const AsyncLoading();
+      state = await AsyncValue.guard(() => _loadCategories(entrepriseId: _currentEntrepriseId!));
+    }
   }
 
   Future<void> loadCategories(String entrepriseId) async {
@@ -53,7 +79,7 @@ class CategorieProduitController extends AsyncNotifier<List<CategorieProduit>> {
 
       // Recharger seulement si c'est la même entreprise
       if (_currentEntrepriseId == entrepriseId) {
-        state = await AsyncValue.guard(() => _loadCategories(entrepriseId: entrepriseId));
+        await refreshCategories();
       }
     } catch (e, stack) {
       state = AsyncError(e, stack);
@@ -76,7 +102,7 @@ class CategorieProduitController extends AsyncNotifier<List<CategorieProduit>> {
 
       // Recharger seulement si c'est la même entreprise
       if (_currentEntrepriseId == categorie.entrepriseId) {
-        state = await AsyncValue.guard(() => _loadCategories(entrepriseId: categorie.entrepriseId));
+        await refreshCategories();
       }
     } catch (e, stack) {
       state = AsyncError(e, stack);
@@ -95,7 +121,7 @@ class CategorieProduitController extends AsyncNotifier<List<CategorieProduit>> {
 
       // Recharger seulement si c'est la même entreprise
       if (_currentEntrepriseId == entrepriseId) {
-        state = await AsyncValue.guard(() => _loadCategories(entrepriseId: entrepriseId));
+        await refreshCategories();
       }
     } catch (e, stack) {
       state = AsyncError(e, stack);

@@ -19,6 +19,7 @@ class ClientList extends ConsumerStatefulWidget {
 
 class _ClientListState extends ConsumerState<ClientList> {
   String? _lastLoadedEntrepriseId;
+  String? _currentSearchQuery;
 
   @override
   void initState() {
@@ -33,6 +34,7 @@ class _ClientListState extends ConsumerState<ClientList> {
     if (activeEntreprise != null &&
         _lastLoadedEntrepriseId != activeEntreprise.id) {
       _lastLoadedEntrepriseId = activeEntreprise.id;
+      _currentSearchQuery = null;
       ref
           .read(clientControllerProvider.notifier)
           .loadClients(activeEntreprise.id);
@@ -49,6 +51,7 @@ class _ClientListState extends ConsumerState<ClientList> {
         _lastLoadedEntrepriseId != activeEntreprise.id) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _lastLoadedEntrepriseId = activeEntreprise.id;
+        _currentSearchQuery = null;
         ref
             .read(clientControllerProvider.notifier)
             .loadClients(activeEntreprise.id);
@@ -70,7 +73,31 @@ class _ClientListState extends ConsumerState<ClientList> {
           drawer: AppDrawer(user: user),
           body: Column(
             children: [
-              const Header(title: 'Clients'),
+              // ✅ Header avec recherche (comme fournisseurs)
+              Header(
+                title: 
+                     'Clients',
+                actions: [
+                  if (activeEntreprise != null) ...[
+                    if (_currentSearchQuery != null)
+                      IconButton(
+                        icon: const Icon(Icons.clear , color: color_white,),
+                        onPressed: () {
+                          setState(() => _currentSearchQuery = null);
+                          ref
+                              .read(clientControllerProvider.notifier)
+                              .loadClients(activeEntreprise.id, forceReload: true);
+                        },
+                        tooltip: 'Effacer la recherche',
+                      ),
+                    IconButton(
+                      icon: const Icon(Icons.search, color: color_white,),
+                      onPressed: () => _showSearchDialog(context, ref, activeEntreprise.id),
+                    ),
+                  ],
+                ],
+              ),
+              
               if (activeEntreprise == null)
                 Padding(
                   padding: const EdgeInsets.all(16.0),
@@ -99,7 +126,11 @@ class _ClientListState extends ConsumerState<ClientList> {
                                   const Icon(Icons.people,
                                       size: 50, color: Colors.grey),
                                   const SizedBox(height: 16),
-                                  const Text('Aucun client enregistré'),
+                                  Text(
+                                    _currentSearchQuery != null
+                                        ? 'Aucun client trouvé pour "${_currentSearchQuery!}"'
+                                        : 'Aucun client enregistré',
+                                  ),
                                   const SizedBox(height: 16),
                                   ElevatedButton(
                                     style: ElevatedButton.styleFrom(
@@ -168,10 +199,11 @@ class _ClientListState extends ConsumerState<ClientList> {
                                           value: 'modifier',
                                           child: Text('Modifier'),
                                         ),
-                                        const PopupMenuItem(
-                                          value: 'appeler',
-                                          child: Text('Appeler'),
-                                        ),
+                                        if (client.telephone != null && client.telephone!.isNotEmpty)
+                                          const PopupMenuItem(
+                                            value: 'appeler',
+                                            child: Text('Appeler'),
+                                          ),
                                         const PopupMenuItem(
                                           value: 'supprimer',
                                           child: Text('Supprimer',
@@ -203,11 +235,104 @@ class _ClientListState extends ConsumerState<ClientList> {
     );
   }
 
+  // ✅ NOUVELLE MÉTHODE : Boîte de dialogue de recherche
+  void _showSearchDialog(
+    BuildContext context,
+    WidgetRef ref,
+    String entrepriseId,
+  ) {
+    final searchController = TextEditingController();
+    bool isLoading = false;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Text("Rechercher un client"),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: searchController,
+                  decoration: InputDecoration(
+                    hintText: "Nom, téléphone, email, adresse, description...",
+                    prefixIcon: const Icon(Icons.search),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onSubmitted: (value) async {
+                    if (value.isNotEmpty) {
+                      setState(() => isLoading = true);
+                      await ref
+                          .read(clientControllerProvider.notifier)
+                          .searchClientsMulti(entrepriseId, value);
+                      setState(() => isLoading = false);
+                      if (context.mounted) {
+                        setState(() => _currentSearchQuery = value);
+                        Navigator.pop(context);
+                      }
+                    }
+                  },
+                ),
+                if (isLoading) 
+                  const Padding(
+                    padding: EdgeInsets.only(top: 16),
+                    child: CircularProgressIndicator(),
+                  ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: isLoading ? null : () {
+                  setState(() => _currentSearchQuery = null);
+                  ref
+                      .read(clientControllerProvider.notifier)
+                      .loadClients(entrepriseId, forceReload: true);
+                  if (context.mounted) Navigator.pop(context);
+                },
+                child: const Text("Afficher tout"),
+              ),
+              ElevatedButton(
+                onPressed: isLoading ? null : () async {
+                  final query = searchController.text.trim();
+                  setState(() => isLoading = true);
+                  
+                  if (query.isNotEmpty) {
+                    await ref
+                        .read(clientControllerProvider.notifier)
+                        .searchClientsMulti(entrepriseId, query);
+                    setState(() => _currentSearchQuery = query);
+                  } else {
+                    await ref
+                        .read(clientControllerProvider.notifier)
+                        .loadClients(entrepriseId);
+                    setState(() => _currentSearchQuery = null);
+                  }
+                  
+                  setState(() => isLoading = false);
+                  if (context.mounted) Navigator.pop(context);
+                },
+                child: const Text("Rechercher"),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
   void _showAddDialog(BuildContext context, String entrepriseId) {
     showDialog(
       context: context,
       builder: (context) => EditClientDialog(entrepriseId: entrepriseId),
-    );
+    ).then((_) {
+      if (_lastLoadedEntrepriseId != null) {
+        ref
+            .read(clientControllerProvider.notifier)
+            .loadClients(_lastLoadedEntrepriseId!, forceReload: true);
+      }
+    });
   }
 
   void _handlePopupSelection(
@@ -221,7 +346,13 @@ class _ClientListState extends ConsumerState<ClientList> {
           context: context,
           builder: (context) =>
               EditClientDialog(client: client, entrepriseId: entrepriseId),
-        );
+        ).then((_) {
+          if (_lastLoadedEntrepriseId != null) {
+            ref
+                .read(clientControllerProvider.notifier)
+                .loadClients(_lastLoadedEntrepriseId!, forceReload: true);
+          }
+        });
         break;
       case 'appeler':
         _callNumber(client.telephone);
@@ -300,7 +431,17 @@ class _ClientListState extends ConsumerState<ClientList> {
   }
 
   Future<void> _callNumber(String? phoneNumber) async {
-    if (phoneNumber == null || phoneNumber.isEmpty) return;
+    if (phoneNumber == null || phoneNumber.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Aucun numéro de téléphone disponible"),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      return;
+    }
 
     final Uri telUri = Uri(scheme: 'tel', path: phoneNumber);
 
@@ -331,16 +472,17 @@ class _ClientListState extends ConsumerState<ClientList> {
             child: const Text('Annuler'),
           ),
           TextButton(
-            onPressed: () async {
-              Navigator.pop(context, true);
-              await _deleteClient(context, client, entrepriseId);
-            },
+            onPressed: () => Navigator.pop(context, true),
             child: const Text('Supprimer',
                 style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
     );
+
+    if (confirmed == true) {
+      await _deleteClient(context, client, entrepriseId);
+    }
   }
 
   Future<void> _deleteClient(

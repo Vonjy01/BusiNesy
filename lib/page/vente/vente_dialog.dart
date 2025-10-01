@@ -349,10 +349,10 @@ etatsState.when(
           },
           child: const Text('Annuler'),
         ),
-        ElevatedButton(
-          onPressed: _ajouterProduit,
-          child: const Text('Ajouter'),
-        ),
+ElevatedButton(
+  onPressed: _ajouterProduit, // DIRECTEMENT l'ancienne méthode
+  child: const Text('Ajouter'),
+),
       ],
     );
   }

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:project6/models/fournisseur_model.dart';
 import 'package:project6/services/database_helper.dart';
@@ -41,25 +43,37 @@ class FournisseurController extends AsyncNotifier<List<Fournisseur>> {
   }
 
   // ⚡ Corrigé : recherche directe en base (nom, téléphone, email, adresse)
-  Future<void> searchFournisseursMulti(String entrepriseId, String query) async {
-    final db = await _dbHelper.database;
+Timer? _searchTimer;
 
-    final fournisseurs = await db.query(
-      'fournisseurs',
-      where:
-          'entreprise_id = ? AND (LOWER(nom) LIKE ? OR telephone LIKE ? OR LOWER(email) LIKE ? OR LOWER(adresse) LIKE ?)',
-      whereArgs: [
-        entrepriseId,
-        '%${query.toLowerCase()}%',
-        '%$query%',
-        '%${query.toLowerCase()}%',
-        '%${query.toLowerCase()}%',
-      ],
-      orderBy: 'nom ASC',
-    );
+Future<void> searchFournisseursMulti(String entrepriseId, String query) async {
+  // Annuler la recherche précédente
+  _searchTimer?.cancel();
+  
+  // Démarrer un nouveau timer
+  _searchTimer = Timer(const Duration(milliseconds: 300), () async {
+    try {
+      final db = await _dbHelper.database;
 
-    state = AsyncData(fournisseurs.map(Fournisseur.fromMap).toList());
-  }
+      final fournisseurs = await db.query(
+        'fournisseurs',
+        where:
+            'entreprise_id = ? AND (LOWER(nom) LIKE ? OR telephone LIKE ? OR LOWER(email) LIKE ? OR LOWER(adresse) LIKE ?)',
+        whereArgs: [
+          entrepriseId,
+          '%${query.toLowerCase()}%',
+          '%$query%',
+          '%${query.toLowerCase()}%',
+          '%${query.toLowerCase()}%',
+        ],
+        orderBy: 'nom ASC',
+      );
+
+      state = AsyncData(fournisseurs.map(Fournisseur.fromMap).toList());
+    } catch (e) {
+      state = AsyncError(e, StackTrace.current);
+    }
+  });
+}
 
 
   Future<void> addFournisseur({
@@ -162,4 +176,5 @@ Future<void> searchFournisseurs(String entrepriseId, String query) async {
 
     return result.isEmpty ? null : Fournisseur.fromMap(result.first);
   }
+  
 }

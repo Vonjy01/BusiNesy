@@ -17,40 +17,23 @@ class CategorieProduitList extends ConsumerStatefulWidget {
 }
 
 class _CategorieProduitListState extends ConsumerState<CategorieProduitList> {
-  String? _lastLoadedEntrepriseId;
 
   @override
   void initState() {
     super.initState();
-    // Charger les catégories après le premier rendu
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadCategoriesIfNeeded();
-    });
+
   }
 
-  void _loadCategoriesIfNeeded() {
-    final activeEntreprise = ref.read(activeEntrepriseProvider).value;
-    if (activeEntreprise != null && _lastLoadedEntrepriseId != activeEntreprise.id) {
-      _lastLoadedEntrepriseId = activeEntreprise.id;
-      ref.read(categorieProduitControllerProvider.notifier).loadCategories(activeEntreprise.id);
-    }
-  }
-
+ 
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authControllerProvider);
     final activeEntreprise = ref.watch(activeEntrepriseProvider).value;
     final categoriesAsync = ref.watch(categorieProduitControllerProvider);
 
-    // Recharger seulement si l'entreprise active change
-    if (activeEntreprise != null && _lastLoadedEntrepriseId != activeEntreprise.id) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _lastLoadedEntrepriseId = activeEntreprise.id;
-        ref.read(categorieProduitControllerProvider.notifier).loadCategories(activeEntreprise.id);
-      });
-    }
+  
 
-    return authState.when(
+   return authState.when(
       loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (error, stack) => Scaffold(body: Center(child: Text('Erreur: $error'))),
       data: (user) {

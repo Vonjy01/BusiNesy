@@ -6,7 +6,7 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 
 class DatabaseHelper {
-  static const String _dbName = 'Gestock.db';
+  static const String dbName = 'BusiNesy.db';
   static const int _dbVersion = 4;
   
 
@@ -23,7 +23,7 @@ class DatabaseHelper {
 
   Future<Database> _initDatabase() async {
     Directory documentsDirectory = await getApplicationDocumentsDirectory();
-    String path = join(documentsDirectory.path, _dbName);
+    String path = join(documentsDirectory.path, dbName);
 
     bool exists = await databaseExists(path);
   if (!exists) {
@@ -32,7 +32,7 @@ class DatabaseHelper {
       
       // Essayez de copier depuis les assets seulement si la base n'existe pas
       try {
-        ByteData data = await rootBundle.load("assets/database/$_dbName");
+        ByteData data = await rootBundle.load("assets/database/$dbName");
         List<int> bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
         await File(path).writeAsBytes(bytes, flush: true);
       } catch (e) {
@@ -53,7 +53,9 @@ class DatabaseHelper {
       },
     );
   }
-
+ void resetDatabase() {
+    _database = null;
+  }
   Future<void> close() async {
     if (_database != null) {
       await _database!.close();

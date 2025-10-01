@@ -47,19 +47,30 @@ class _ProduitDialogState extends ConsumerState<ProduitDialog> {
     if (widget.produit != null) {
       // Remplissage des valeurs existantes pour modification
       _nomController.text = widget.produit!.nom;
-      _prixVenteController.text = widget.produit!.prixVente.toString();
-      _prixAchatController.text = widget.produit!.prixAchat.toString();
+      _prixVenteController.text = widget.produit!.prixVente.toStringAsFixed(2);
+      _prixAchatController.text = widget.produit!.prixAchat.toStringAsFixed(2);
       _stockController.text = widget.produit!.stock.toString();
       _defectueuxController.text = widget.produit!.defectueux.toString();
-      _beneficeController.text = widget.produit!.benefice?.toString() ?? '';
+      _beneficeController.text = _calculerBeneficeFromPrix(
+        widget.produit!.prixVente, 
+        widget.produit!.prixAchat
+      );
       _descriptionController.text = widget.produit!.description ?? '';
       _seuilAlerteController.text = widget.produit!.seuilAlerte.toString();
       _selectedCategorieId = widget.produit!.categorieId;
     }
+
+    // Ajouter les listeners pour le calcul automatique du bénéfice
+    _prixVenteController.addListener(_calculerBeneficeAutomatique);
+    _prixAchatController.addListener(_calculerBeneficeAutomatique);
   }
 
   @override
   void dispose() {
+    // Nettoyer les listeners
+    _prixVenteController.removeListener(_calculerBeneficeAutomatique);
+    _prixAchatController.removeListener(_calculerBeneficeAutomatique);
+    
     _nomController.dispose();
     _prixVenteController.dispose();
     _prixAchatController.dispose();
@@ -69,6 +80,48 @@ class _ProduitDialogState extends ConsumerState<ProduitDialog> {
     _defectueuxController.dispose();
     _seuilAlerteController.dispose();
     super.dispose();
+  }
+
+  // ⚡ CALCUL AUTOMATIQUE du bénéfice
+  void _calculerBeneficeAutomatique() {
+    final prixVenteText = _prixVenteController.text;
+    final prixAchatText = _prixAchatController.text;
+
+    if (prixVenteText.isNotEmpty && prixAchatText.isNotEmpty) {
+      final prixVente = double.tryParse(prixVenteText);
+      final prixAchat = double.tryParse(prixAchatText);
+
+      if (prixVente != null && prixAchat != null) {
+        final benefice = prixVente - prixAchat;
+        
+        setState(() {
+          _beneficeController.text = benefice.toStringAsFixed(2);
+        });
+        return;
+      }
+    }
+    
+    // Si les champs sont vides ou invalides
+    setState(() {
+      _beneficeController.text = '';
+    });
+  }
+
+  // ⚡ Méthode utilitaire pour calculer le bénéfice à partir des prix
+  String _calculerBeneficeFromPrix(double prixVente, double prixAchat) {
+    return (prixVente - prixAchat).toStringAsFixed(2);
+  }
+
+  // ⚡ MÉTHODE pour formater les nombres avec 2 décimales
+  void _formaterPrix(TextEditingController controller) {
+    final text = controller.text;
+    if (text.isNotEmpty) {
+      final value = double.tryParse(text);
+      if (value != null) {
+        controller.text = value.toStringAsFixed(2);
+        _calculerBeneficeAutomatique(); // Recalculer après formatage
+      }
+    }
   }
 
   @override
@@ -84,10 +137,12 @@ class _ProduitDialogState extends ConsumerState<ProduitDialog> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+                            const SizedBox(height: 16),
+
               TextFormField(
                 controller: _nomController,
                 decoration: const InputDecoration(
-                  labelText: 'Nom du produit *',
+                  labelText: 'Nom du produit ',
                   border: OutlineInputBorder(),
                 ),
                 validator: (value) {
@@ -98,96 +153,8 @@ class _ProduitDialogState extends ConsumerState<ProduitDialog> {
                 },
               ),
               const SizedBox(height: 16),
-              TextFormField(
-                controller: _prixVenteController,
-                keyboardType: TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(
-                  labelText: 'Prix de vente *',
-                  border: OutlineInputBorder(),
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Ce champ est obligatoire';
-                  }
-                  if (double.tryParse(value) == null) {
-                    return 'Veuillez entrer un nombre valide';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _prixAchatController,
-                keyboardType: TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(
-                  labelText: 'Prix d\'achat *',
-                  border: OutlineInputBorder(),
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Ce champ est obligatoire';
-                  }
-                  if (double.tryParse(value) == null) {
-                    return 'Veuillez entrer un nombre valide';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _stockController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Stock *',
-                  border: OutlineInputBorder(),
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Ce champ est obligatoire';
-                  }
-                  if (int.tryParse(value) == null) {
-                    return 'Veuillez entrer un nombre entier';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _defectueuxController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Défectueux',
-                  border: OutlineInputBorder(),
-                  hintText: '0 par défaut',
-                ),
-                validator: (value) {
-                  if (value != null && value.isNotEmpty && int.tryParse(value) == null) {
-                    return 'Nombre entier seulement';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _seuilAlerteController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Seuil d\'alerte stock bas *',
-                  border: OutlineInputBorder(),
-                  hintText: '5 par défaut',
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Ce champ est obligatoire';
-                  }
-                  if (int.tryParse(value) == null) {
-                    return 'Veuillez entrer un nombre entier';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              categories.when(
+
+                  categories.when(
                 loading: () => const CircularProgressIndicator(),
                 error: (_, __) => const Text('Erreur de chargement des catégories'),
                 data: (categories) {
@@ -202,7 +169,7 @@ class _ProduitDialogState extends ConsumerState<ProduitDialog> {
                   return DropdownButtonFormField<int>(
                     value: _selectedCategorieId,
                     decoration: const InputDecoration(
-                      labelText: 'Catégorie *',
+                      labelText: 'Catégorie ',
                       border: OutlineInputBorder(),
                     ),
                     items: categories.map((c) {
@@ -226,6 +193,156 @@ class _ProduitDialogState extends ConsumerState<ProduitDialog> {
                 },
               ),
               const SizedBox(height: 16),
+              
+              // Prix d'achat
+              TextFormField(
+                controller: _prixAchatController,
+                keyboardType: TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  labelText: 'Prix d\'achat ',
+                  border: OutlineInputBorder(),
+                ),
+                onChanged: (value) {
+                  // Calcul immédiat à chaque changement
+                  if (value.isNotEmpty) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      _calculerBeneficeAutomatique();
+                    });
+                  }
+                },
+                onEditingComplete: () => _formaterPrix(_prixAchatController),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Ce champ est obligatoire';
+                  }
+                  if (double.tryParse(value) == null) {
+                    return 'Veuillez entrer un nombre valide';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              
+              // Prix de vente
+              TextFormField(
+                controller: _prixVenteController,
+                keyboardType: TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  labelText: 'Prix de vente ',
+                  border: OutlineInputBorder(),
+                ),
+                onChanged: (value) {
+                  // Calcul immédiat à chaque changement
+                  if (value.isNotEmpty) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      _calculerBeneficeAutomatique();
+                    });
+                  }
+                },
+                onEditingComplete: () => _formaterPrix(_prixVenteController),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Ce champ est obligatoire';
+                  }
+                  if (double.tryParse(value) == null) {
+                    return 'Veuillez entrer un nombre valide';
+                  }
+                  
+                  // ⚡ VALIDATION : Vérifier que le prix de vente >= prix d'achat
+                  final prixAchat = double.tryParse(_prixAchatController.text);
+                  final prixVente = double.tryParse(value);
+                  if (prixAchat != null && prixVente != null && prixVente < prixAchat) {
+                    return 'Le prix de vente doit être ≥ au prix d\'achat';
+                  }
+                  
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              
+              // Bénéfice (calculé automatiquement)
+              TextFormField(
+                controller: _beneficeController,
+                keyboardType: TextInputType.numberWithOptions(decimal: true),
+                decoration: InputDecoration(
+                  labelText: 'Bénéfice ',
+                  border: const OutlineInputBorder(),
+                  filled: true,
+                ),
+                readOnly: true, // ⚡ Champ en lecture seule
+                style: TextStyle(
+                  color: _getBeneficeColor(),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+              
+         
+              const SizedBox(height: 16),
+              
+              // Stock
+              TextFormField(
+                controller: _stockController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Stock ',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Ce champ est obligatoire';
+                  }
+                  if (int.tryParse(value) == null) {
+                    return 'Veuillez entrer un nombre entier';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              
+              // Défectueux
+              TextFormField(
+                controller: _defectueuxController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Défectueux',
+                  border: OutlineInputBorder(),
+                  hintText: '0 par défaut',
+                ),
+                validator: (value) {
+                  if (value != null && value.isNotEmpty && int.tryParse(value) == null) {
+                    return 'Nombre entier seulement';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              
+              // Seuil d'alerte
+              TextFormField(
+                controller: _seuilAlerteController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Seuil d\'alerte stock bas ',
+                  border: OutlineInputBorder(),
+                  hintText: '5 par défaut',
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Ce champ est obligatoire';
+                  }
+                  if (int.tryParse(value) == null) {
+                    return 'Veuillez entrer un nombre entier';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              
+              // Catégorie
+          
+              
+              // Description
               TextFormField(
                 controller: _descriptionController,
                 decoration: const InputDecoration(
@@ -233,21 +350,6 @@ class _ProduitDialogState extends ConsumerState<ProduitDialog> {
                   border: OutlineInputBorder(),
                 ),
                 maxLines: 2,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _beneficeController,
-                keyboardType: TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(
-                  labelText: 'Bénéfice',
-                  border: OutlineInputBorder(),
-                ),
-                validator: (value) {
-                  if (value != null && value.isNotEmpty && double.tryParse(value) == null) {
-                    return 'Veuillez entrer un nombre valide';
-                  }
-                  return null;
-                },
               ),
             ],
           ),
@@ -272,11 +374,38 @@ class _ProduitDialogState extends ConsumerState<ProduitDialog> {
     );
   }
 
+  // ⚡ MÉTHODE pour déterminer la couleur du bénéfice
+  Color _getBeneficeColor() {
+    final beneficeText = _beneficeController.text;
+    if (beneficeText.isNotEmpty) {
+      final benefice = double.tryParse(beneficeText);
+      if (benefice != null) {
+        if (benefice > 0) return Colors.green;
+        if (benefice < 0) return Colors.red;
+        return Colors.orange; // Bénéfice = 0
+      }
+    }
+    return Colors.grey;
+  }
+
   Future<void> _handleSubmit(BuildContext context, bool isEditing) async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedCategorieId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Veuillez sélectionner une catégorie')),
+      );
+      return;
+    }
+
+    // ⚡ VALIDATION FINALE : Vérifier que le bénéfice n'est pas négatif
+    final prixAchat = double.tryParse(_prixAchatController.text);
+    final prixVente = double.tryParse(_prixVenteController.text);
+    if (prixAchat != null && prixVente != null && prixVente < prixAchat) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Le prix de vente doit être supérieur au prix d\'achat'),
+          backgroundColor: Colors.red,
+        ),
       );
       return;
     }
@@ -297,9 +426,7 @@ class _ProduitDialogState extends ConsumerState<ProduitDialog> {
         createdAt: isEditing ? widget.produit!.createdAt : DateTime.now(),
         updatedAt: DateTime.now(),
         categorieId: _selectedCategorieId!,
-        benefice: _beneficeController.text.isNotEmpty
-            ? double.parse(_beneficeController.text)
-            : null,
+        benefice: double.tryParse(_beneficeController.text),
       );
 
       final controller = ref.read(produitControllerProvider.notifier);

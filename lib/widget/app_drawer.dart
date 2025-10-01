@@ -11,8 +11,10 @@ import 'package:project6/page/command/command_list.dart';
 import 'package:project6/page/entreprise/entreprise_selection.dart';
 import 'package:project6/page/fournisseur/fournisseur_list.dart';
 import 'package:project6/page/home_page.dart';
+import 'package:project6/page/note/note_list.dart';
 import 'package:project6/page/produit/produit_list.dart';
 import 'package:project6/page/vente/vente_list.dart';
+import 'package:project6/services/database_backup.dart';
 import 'package:project6/utils/constant.dart';
 import 'package:project6/widget/logo.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -171,7 +173,7 @@ class AppDrawer extends ConsumerWidget {
                     context,
                     const Icon(Icons.help_center_outlined, color: color_white),
                     'Aide',
-                    const HomePage(),
+                    const DatabaseBackupPage(),
                   ),
                   ListTile(
                     leading: CircleAvatar(
@@ -195,9 +197,21 @@ class AppDrawer extends ConsumerWidget {
                   ),
                   ListDrawer(
                     context,
+                    const Icon(Icons.note_alt_outlined, color: color_white),
+                    'Note',
+                    const NoteList(),
+                  ),
+                  ListDrawer(
+                    context,
                     const Icon(Icons.settings, color: color_white),
                     'Paramètre',
                     const HomePage(),
+                  ),
+                  ListDrawer(
+                    context,
+                    const Icon(Icons.save, color: color_white),
+                    'Sauvegarde',
+                     DatabaseBackupPage(),
                   ),
                   const Divider(),
                   ListTile(

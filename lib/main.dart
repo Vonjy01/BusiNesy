@@ -3,10 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:project6/controller/auth_controller.dart';
-import 'package:project6/controller/entreprise_controller.dart';
 import 'package:project6/controller/etat_commande.dart';
 import 'package:project6/page/auth/login_page.dart';
 import 'package:project6/page/entreprise/entreprise_selection.dart';
+import 'package:project6/services/database_backup.dart';
 import 'package:project6/services/database_helper.dart';
 
 void main() async {
@@ -17,9 +17,7 @@ void main() async {
       statusBarIconBrightness: Brightness.light,
     ),
   );
-    final container = ProviderContainer();
-  await container.read(etatCommandeControllerProvider.future);
-  // Initialisation de la base de données
+    final container = ProviderContainer();  // Initialisation de la base de données
   await DatabaseHelper.instance.database;
   await DatabaseHelper.instance.debugDatabase();
 
@@ -31,6 +29,7 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+
     return MaterialApp(
       title: 'Gestion Stock',
       debugShowCheckedModeBanner: false,
@@ -39,10 +38,11 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
       ),
       home: const AuthWrapper(),
-      // Ajoutez cette configuration pour les routes nommées
       routes: {
         '/login': (context) => const LoginScreen(),
         '/entreprise-selection': (context) => const EntrepriseSelectionPage(),
+        '/database-backup': (context) => const DatabaseBackupPage(),
+
       },
     );
   }

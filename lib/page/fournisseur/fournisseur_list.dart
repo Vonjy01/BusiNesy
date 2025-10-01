@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -19,7 +21,8 @@ class FournisseurList extends ConsumerStatefulWidget {
 
 class _FournisseurListState extends ConsumerState<FournisseurList> {
   String? _lastLoadedEntrepriseId;
-
+  String? _currentSearchQuery;
+  Timer? _searchTimer; 
   @override
   void initState() {
     super.initState();
@@ -33,6 +36,7 @@ class _FournisseurListState extends ConsumerState<FournisseurList> {
     if (activeEntreprise != null &&
         _lastLoadedEntrepriseId != activeEntreprise.id) {
       _lastLoadedEntrepriseId = activeEntreprise.id;
+      _currentSearchQuery = null; // Reset la recherche quand on change d'entreprise
       ref
           .read(fournisseurControllerProvider.notifier)
           .loadFournisseurs(activeEntreprise.id);
@@ -41,7 +45,7 @@ class _FournisseurListState extends ConsumerState<FournisseurList> {
 
   @override
   Widget build(BuildContext context) {
-    final authState = ref.watch(authControllerProvider);
+    final authState = ref.watch(authControllerProvider);  
     final activeEntreprise = ref.watch(activeEntrepriseProvider).value;
     final fournisseursAsync = ref.watch(fournisseurControllerProvider);
 
@@ -49,6 +53,7 @@ class _FournisseurListState extends ConsumerState<FournisseurList> {
         _lastLoadedEntrepriseId != activeEntreprise.id) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _lastLoadedEntrepriseId = activeEntreprise.id;
+        _currentSearchQuery = null; // Reset la recherche
         ref
             .read(fournisseurControllerProvider.notifier)
             .loadFournisseurs(activeEntreprise.id);
@@ -71,16 +76,28 @@ class _FournisseurListState extends ConsumerState<FournisseurList> {
           drawer: AppDrawer(user: user),
           body: Column(
             children: [
-              // ✅ Header avec bouton recherche
+              // ✅ Header avec bouton recherche et indicateur de recherche
               Header(
-                title: 'Fournisseurs',
+                title: 
+                     'Fournisseurs',
                 actions: [
-                  if (activeEntreprise != null)
+                  if (activeEntreprise != null) ...[
+                    if (_currentSearchQuery != null)
+                      IconButton(
+                        icon: const Icon(Icons.clear , color: color_white,),
+                        onPressed: () {
+                          setState(() => _currentSearchQuery = null);
+                          ref
+                              .read(fournisseurControllerProvider.notifier)
+                              .loadFournisseurs(activeEntreprise.id, forceReload: true);
+                        },
+                        tooltip: 'Effacer la recherche',
+                      ),
                     IconButton(
-                      icon: const Icon(Icons.search),
-                      onPressed: () =>
-                          _showSearchDialog(context, ref, activeEntreprise.id),
+                      icon: const Icon(Icons.search, color: color_white,),
+                      onPressed: () => _showSearchDialog(context, ref, activeEntreprise.id),
                     ),
+                  ],
                 ],
               ),
 
@@ -118,7 +135,11 @@ class _FournisseurListState extends ConsumerState<FournisseurList> {
                                     color: Colors.grey,
                                   ),
                                   const SizedBox(height: 16),
-                                  const Text('Aucun fournisseur enregistré'),
+                                  Text(
+                                    _currentSearchQuery != null
+                                        ? 'Aucun fournisseur trouvé pour "${_currentSearchQuery!}"'
+                                        : 'Aucun fournisseur enregistré',
+                                  ),
                                   const SizedBox(height: 16),
                                   ElevatedButton(
                                     style: ElevatedButton.styleFrom(
@@ -198,10 +219,12 @@ class _FournisseurListState extends ConsumerState<FournisseurList> {
                                           value: 'modifier',
                                           child: Text('Modifier'),
                                         ),
-                                        const PopupMenuItem(
-                                          value: 'appeler',
-                                          child: Text('Appeler'),
-                                        ),
+                                        if (fournisseur.telephone != null &&
+                                            fournisseur.telephone!.isNotEmpty)
+                                          const PopupMenuItem(
+                                            value: 'appeler',
+                                            child: Text('Appeler'),
+                                          ),
                                         const PopupMenuItem(
                                           value: 'supprimer',
                                           child: Text(
@@ -239,54 +262,82 @@ class _FournisseurListState extends ConsumerState<FournisseurList> {
     String entrepriseId,
   ) {
     final searchController = TextEditingController();
+    bool isLoading = false;
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text("Rechercher un fournisseur"),
-        content: TextField(
-          controller: searchController,
-          decoration: InputDecoration(
-            hintText: "Nom, téléphone, email, adresse...",
-            prefixIcon: const Icon(Icons.search),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-          ),
-        ),
-        actions: [
-          // ✅ Bouton Afficher tout
-          TextButton(
-            onPressed: () {
-              ref
-                  .read(fournisseurControllerProvider.notifier)
-                  .loadFournisseurs(
-                    entrepriseId,
-                    forceReload: true,
-                  ); // ⚡ ajout forceReload
-              Navigator.pop(context);
-            },
-            child: const Text("Afficher tout"),
-          ),
-
-          // ✅ Bouton Rechercher
-          ElevatedButton(
-            onPressed: () {
-              final query = searchController.text.trim();
-              if (query.isNotEmpty) {
-                ref
-                    .read(fournisseurControllerProvider.notifier)
-                    .searchFournisseursMulti(entrepriseId, query);
-              } else {
-                // Si vide, recharge tous
-                ref
-                    .read(fournisseurControllerProvider.notifier)
-                    .loadFournisseurs(entrepriseId);
-              }
-              Navigator.pop(context);
-            },
-            child: const Text("Rechercher"),
-          ),
-        ],
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Text("Rechercher un fournisseur"),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: searchController,
+                  decoration: InputDecoration(
+                    hintText: "Nom, téléphone, email, adresse...",
+                    prefixIcon: const Icon(Icons.search),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onSubmitted: (value) async {
+                    if (value.isNotEmpty) {
+                      setState(() => isLoading = true);
+                      await ref
+                          .read(fournisseurControllerProvider.notifier)
+                          .searchFournisseursMulti(entrepriseId, value);
+                      setState(() => isLoading = false);
+                      if (context.mounted) {
+                        setState(() => _currentSearchQuery = value);
+                        Navigator.pop(context);
+                      }
+                    }
+                  },
+                ),
+                if (isLoading) 
+                  const Padding(
+                    padding: EdgeInsets.only(top: 16),
+                    child: CircularProgressIndicator(),
+                  ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: isLoading ? null : () {
+                  setState(() => _currentSearchQuery = null);
+                  ref
+                      .read(fournisseurControllerProvider.notifier)
+                      .loadFournisseurs(entrepriseId, forceReload: true);
+                  if (context.mounted) Navigator.pop(context);
+                },
+                child: const Text("Afficher tout"),
+              ),
+              ElevatedButton(
+                onPressed: isLoading ? null : () async {
+                  final query = searchController.text.trim();
+                  setState(() => isLoading = true);
+                  
+                  if (query.isNotEmpty) {
+                    await ref
+                        .read(fournisseurControllerProvider.notifier)
+                        .searchFournisseursMulti(entrepriseId, query);
+                    setState(() => _currentSearchQuery = query);
+                  } else {
+                    await ref
+                        .read(fournisseurControllerProvider.notifier)
+                        .loadFournisseurs(entrepriseId);
+                    setState(() => _currentSearchQuery = null);
+                  }
+                  
+                  setState(() => isLoading = false);
+                  if (context.mounted) Navigator.pop(context);
+                },
+                child: const Text("Rechercher"),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -295,7 +346,14 @@ class _FournisseurListState extends ConsumerState<FournisseurList> {
     showDialog(
       context: context,
       builder: (context) => EditFournisseurDialog(entrepriseId: entrepriseId),
-    );
+    ).then((_) {
+      // Rafraîchir la liste après ajout
+      if (_lastLoadedEntrepriseId != null) {
+        ref
+            .read(fournisseurControllerProvider.notifier)
+            .loadFournisseurs(_lastLoadedEntrepriseId!, forceReload: true);
+      }
+    });
   }
 
   void _handlePopupSelection(
@@ -315,7 +373,14 @@ class _FournisseurListState extends ConsumerState<FournisseurList> {
             fournisseur: fournisseur,
             entrepriseId: entrepriseId,
           ),
-        );
+        ).then((_) {
+          // Rafraîchir la liste après modification
+          if (_lastLoadedEntrepriseId != null) {
+            ref
+                .read(fournisseurControllerProvider.notifier)
+                .loadFournisseurs(_lastLoadedEntrepriseId!, forceReload: true);
+          }
+        });
         break;
       case 'appeler':
         _callNumber(fournisseur.telephone);
@@ -330,7 +395,7 @@ class _FournisseurListState extends ConsumerState<FournisseurList> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('${fournisseur.nom}'),
+        title: Text(fournisseur.nom),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -383,7 +448,17 @@ class _FournisseurListState extends ConsumerState<FournisseurList> {
 
   /// 📞 Appeler un numéro
   Future<void> _callNumber(String? phoneNumber) async {
-    if (phoneNumber == null || phoneNumber.isEmpty) return;
+    if (phoneNumber == null || phoneNumber.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Aucun numéro de téléphone disponible"),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      return;
+    }
 
     final Uri telUri = Uri(scheme: 'tel', path: phoneNumber);
 
@@ -417,15 +492,16 @@ class _FournisseurListState extends ConsumerState<FournisseurList> {
             child: const Text('Annuler'),
           ),
           TextButton(
-            onPressed: () async {
-              Navigator.pop(context, true);
-              await _deleteFournisseur(context, fournisseur, entrepriseId);
-            },
+            onPressed: () => Navigator.pop(context, true),
             child: const Text('Supprimer', style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
     );
+
+    if (confirmed == true) {
+      await _deleteFournisseur(context, fournisseur, entrepriseId);
+    }
   }
 
   Future<void> _deleteFournisseur(
@@ -455,5 +531,10 @@ class _FournisseurListState extends ConsumerState<FournisseurList> {
         );
       }
     }
+  }
+    @override
+  void dispose() {
+    _searchTimer?.cancel(); // Annuler le timer du widget
+    super.dispose();
   }
 }
